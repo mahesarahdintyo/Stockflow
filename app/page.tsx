@@ -83,7 +83,7 @@ export default function Page() {
   const [partCoil, setPartCoil] = useState('')
   const [partSpec, setPartSpec] = useState('')
   const [partNumber, setPartNumber] = useState('')
-  const [partLine, setPartLine] = useState('YHA')
+  const [partLine, setPartLine] = useState('')
   const [partOpening, setPartOpening] = useState('0')
 
   // Load from localStorage on mount (tanpa perlu akun Supabase)
@@ -198,27 +198,40 @@ export default function Page() {
       coil: partCoil.trim() || partId.trim().toUpperCase(),
       spec: partSpec.trim() || '-',
       part: partNumber.trim() || partId.trim().toUpperCase(),
-      line: partLine.trim() || 'YHA',
+      line: partLine.trim().toUpperCase() || '-',
       opening: Number(partOpening) || 0,
       active: true,
     }
 
     setParts((prev) => [newPart, ...prev.filter((p) => p.id !== newPart.id)])
     setSelectedPartId(newPart.id)
-    setShowPartForm(false)
+    handleClosePartForm()
+  }
 
-    // Reset form fields
+  function handleOpenPartForm() {
     setPartId('')
     setPartCoil('')
     setPartSpec('')
     setPartNumber('')
+    setPartLine('')
+    setPartOpening('0')
+    setShowPartForm(true)
+  }
+
+  function handleClosePartForm() {
+    setShowPartForm(false)
+    setPartId('')
+    setPartCoil('')
+    setPartSpec('')
+    setPartNumber('')
+    setPartLine('')
     setPartOpening('0')
   }
 
   function handleOpenMovementForm() {
     if (parts.length === 0) {
       alert('Silakan tambah Master Part terlebih dahulu sebelum mencatat pergerakan stok.')
-      setShowPartForm(true)
+      handleOpenPartForm()
       return
     }
     if (!selectedPartId && parts.length > 0) {
@@ -385,7 +398,7 @@ export default function Page() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setShowPartForm(true)}
+                    onClick={handleOpenPartForm}
                     className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-sm transition"
                   >
                     <Boxes size={16} /> + Master Part
@@ -505,7 +518,7 @@ export default function Page() {
                       />
                     </div>
                     <button
-                      onClick={() => setShowPartForm(true)}
+                      onClick={handleOpenPartForm}
                       className="flex items-center gap-1.5 rounded-lg bg-[#202932] px-3 py-2 text-xs font-bold text-white hover:bg-[#2c3945]"
                     >
                       <Plus size={14} /> Tambah Part
@@ -520,7 +533,7 @@ export default function Page() {
                   )}
                   partStats={partStats}
                   onDelete={handleDeletePart}
-                  onAddNew={() => setShowPartForm(true)}
+                  onAddNew={handleOpenPartForm}
                 />
               </section>
             </>
@@ -588,7 +601,7 @@ export default function Page() {
                   <h2 className="text-2xl font-bold">Master Part</h2>
                 </div>
                 <button
-                  onClick={() => setShowPartForm(true)}
+                  onClick={handleOpenPartForm}
                   className="flex items-center justify-center gap-2 rounded-lg bg-[#202932] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#2c3945]"
                 >
                   <Plus size={16} /> + Tambah Part Baru
@@ -619,7 +632,7 @@ export default function Page() {
                   )}
                   partStats={partStats}
                   onDelete={handleDeletePart}
-                  onAddNew={() => setShowPartForm(true)}
+                  onAddNew={handleOpenPartForm}
                 />
               </div>
             </>
@@ -676,8 +689,8 @@ export default function Page() {
                   <table className="w-full min-w-[700px] text-left text-xs">
                     <thead className="border-b border-slate-100 text-[10px] uppercase tracking-wider text-slate-400">
                       <tr>
-                        <th className="py-3 px-3">Part ID</th>
-                        <th className="py-3 px-3">Part Number</th>
+                        <th className="py-3 px-3">FII ID</th>
+                        <th className="py-3 px-3">PART NUMBER</th>
                         <th className="py-3 px-3">Line</th>
                         <th className="py-3 px-3 text-right">Stok Awal</th>
                         <th className="py-3 px-3 text-right">Total Masuk (IN)</th>
@@ -750,8 +763,8 @@ export default function Page() {
                     <button
                       type="button"
                       onClick={() => {
-                        setShowMovementForm(false)
-                        setShowPartForm(true)
+                        handleCloseMovementForm()
+                        handleOpenPartForm()
                       }}
                       className="underline font-bold"
                     >
@@ -892,7 +905,7 @@ export default function Page() {
                 <h2 className="mt-1 text-xl font-bold">Tambah Master Part Baru</h2>
               </div>
               <button
-                onClick={() => setShowPartForm(false)}
+                onClick={handleClosePartForm}
                 aria-label="Close"
                 className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 transition"
               >
@@ -904,7 +917,7 @@ export default function Page() {
               <div className="space-y-4 p-6">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block mb-1.5 text-xs font-bold text-slate-600">Kode / Part ID *</label>
+                    <label className="block mb-1.5 text-xs font-bold text-slate-600">FII ID *</label>
                     <input
                       type="text"
                       required
@@ -915,7 +928,7 @@ export default function Page() {
                     />
                   </div>
                   <div>
-                    <label className="block mb-1.5 text-xs font-bold text-slate-600">No Coil</label>
+                    <label className="block mb-1.5 text-xs font-bold text-slate-600">PART NUM COIL</label>
                     <input
                       type="text"
                       value={partCoil}
@@ -927,7 +940,7 @@ export default function Page() {
                 </div>
 
                 <div>
-                  <label className="block mb-1.5 text-xs font-bold text-slate-600">Nama / Nomor Part *</label>
+                  <label className="block mb-1.5 text-xs font-bold text-slate-600">PART NUMBER *</label>
                   <input
                     type="text"
                     required
@@ -940,7 +953,7 @@ export default function Page() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block mb-1.5 text-xs font-bold text-slate-600">Spesifikasi Material</label>
+                    <label className="block mb-1.5 text-xs font-bold text-slate-600">COIL SPEC</label>
                     <input
                       type="text"
                       value={partSpec}
@@ -980,7 +993,7 @@ export default function Page() {
               <div className="flex justify-end gap-3 border-t border-slate-100 p-6 bg-slate-50/50">
                 <button
                   type="button"
-                  onClick={() => setShowPartForm(false)}
+                  onClick={handleClosePartForm}
                   className="rounded-lg px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100"
                 >
                   Batal
@@ -1161,10 +1174,10 @@ function PartTable({
       <table className="w-full min-w-[750px] text-left text-xs">
         <thead className="bg-[#fafbfc] text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
           <tr>
-            <th className="px-5 py-3">Part ID</th>
-            <th className="px-3 py-3">Part Number</th>
-            <th className="px-3 py-3">Coil Number</th>
-            <th className="px-3 py-3">Spesifikasi Material</th>
+            <th className="px-5 py-3">FII ID</th>
+            <th className="px-3 py-3">PART NUMBER</th>
+            <th className="px-3 py-3">PART NUM COIL</th>
+            <th className="px-3 py-3">COIL SPEC</th>
             <th className="px-3 py-3">Line</th>
             <th className="px-3 py-3 text-right">Stok Awal</th>
             <th className="px-3 py-3 text-right font-bold">Stok Saat Ini</th>
