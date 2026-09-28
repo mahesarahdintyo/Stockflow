@@ -1223,7 +1223,7 @@ function PartTable({
             onClick={onAddNew}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#a17e00] hover:underline"
           >
-            <Plus size={14} /> + Tambah Master Part Baru
+            <Plus size={14} /> Tambah Master Part Baru
           </button>
         </div>
       )}
