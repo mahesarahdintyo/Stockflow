@@ -7,19 +7,29 @@ import {
   BarChart3,
   Bell,
   Boxes,
+  Calendar,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
   ClipboardList,
   Download,
+  Edit2,
   FileSpreadsheet,
+  Filter,
+  History,
   LayoutDashboard,
+  Lock,
   MoreHorizontal,
   PackageCheck,
   Plus,
   RotateCcw,
   Search,
   Settings,
+  ShieldCheck,
   SlidersHorizontal,
   Trash2,
+  User,
   Warehouse,
   X,
 } from 'lucide-react'
@@ -41,6 +51,46 @@ export interface MovementItem {
   type: 'IN' | 'OUT'
   qty: number
   note: string
+  operator?: string
+  role?: string
+}
+
+export type UserRole = 'RECEIVING' | 'PRODUCTION' | 'SUPERVISOR'
+
+export interface RoleConfig {
+  id: UserRole
+  name: string
+  label: string
+  description: string
+  allowedTypes: ('IN' | 'OUT')[]
+  badgeColor: string
+}
+
+export const ROLES: Record<UserRole, RoleConfig> = {
+  SUPERVISOR: {
+    id: 'SUPERVISOR',
+    name: 'Warehouse Admin',
+    label: 'Full Access (IN & OUT)',
+    description: 'Akses penuh pencatatan barang masuk & keluar',
+    allowedTypes: ['IN', 'OUT'],
+    badgeColor: 'bg-amber-50 text-amber-800 border-amber-300',
+  },
+  RECEIVING: {
+    id: 'RECEIVING',
+    name: 'Operator Receiving',
+    label: 'Hanya IN (Masuk)',
+    description: 'Penerimaan material baru dari supplier',
+    allowedTypes: ['IN'],
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-300',
+  },
+  PRODUCTION: {
+    id: 'PRODUCTION',
+    name: 'Operator Produksi',
+    label: 'Hanya OUT (Keluar)',
+    description: 'Pengambilan material untuk pemakaian line',
+    allowedTypes: ['OUT'],
+    badgeColor: 'bg-rose-50 text-rose-700 border-rose-300',
+  },
 }
 
 const navItems = [
@@ -48,6 +98,7 @@ const navItems = [
   { label: 'Stock Movement', icon: ClipboardList },
   { label: 'Master Part', icon: Boxes },
   { label: 'Report', icon: BarChart3 },
+  { label: 'Riwayat', icon: History },
 ]
 
 function formatNumber(value: number) {
@@ -71,6 +122,25 @@ export default function Page() {
   const [month, setMonth] = useState('September 2026')
   const [lineFilter, setLineFilter] = useState('All lines')
 
+  // Role state (RBAC Simulator)
+  const [currentRole, setCurrentRole] = useState<UserRole>('SUPERVISOR')
+
+  // Stock Movement type filter
+  const [movementTypeFilter, setMovementTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL')
+
+  // Riwayat filter state
+  const [riwayatFromDate, setRiwayatFromDate] = useState(() => {
+    const d = new Date()
+    d.setDate(1)
+    return d.toISOString().split('T')[0]
+  })
+  const [riwayatToDate, setRiwayatToDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [riwayatPartFilter, setRiwayatPartFilter] = useState('ALL')
+  const [riwayatTypeFilter, setRiwayatTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL')
+  const [riwayatSearch, setRiwayatSearch] = useState('')
+  const [riwayatPage, setRiwayatPage] = useState(1)
+  const RIWAYAT_PAGE_SIZE = 20
+
   // Movement Form fields
   const [movType, setMovType] = useState<'IN' | 'OUT'>('IN')
   const [selectedPartId, setSelectedPartId] = useState('')
@@ -91,6 +161,7 @@ export default function Page() {
     try {
       const savedParts = localStorage.getItem('stockflow_parts')
       const savedMovements = localStorage.getItem('stockflow_movements')
+      const savedRole = localStorage.getItem('stockflow_role') as UserRole
       if (savedParts) {
         const parsed = JSON.parse(savedParts)
         if (Array.isArray(parsed)) setParts(parsed)
@@ -99,12 +170,21 @@ export default function Page() {
         const parsed = JSON.parse(savedMovements)
         if (Array.isArray(parsed)) setMovements(parsed)
       }
+      if (savedRole && ROLES[savedRole]) {
+        setCurrentRole(savedRole)
+      }
     } catch (e) {
       console.error('Failed to load local data:', e)
     } finally {
       setIsLoaded(true)
     }
   }, [])
+
+  // Auto-save role
+  useEffect(() => {
+    if (!isLoaded) return
+    localStorage.setItem('stockflow_role', currentRole)
+  }, [currentRole, isLoaded])
 
   // Auto-save to localStorage
   useEffect(() => {
@@ -173,11 +253,12 @@ export default function Page() {
     return movements.filter((movement) => {
       const part = parts.find((p) => p.id === movement.partId)
       const matchesLine = lineFilter === 'All lines' || part?.line === lineFilter
+      const matchesType = movementTypeFilter === 'ALL' || movement.type === movementTypeFilter
       const queryTarget = `${movement.id} ${movement.partId} ${part?.part || ''} ${part?.coil || ''} ${movement.note}`.toLowerCase()
       const matchesQuery = !query || queryTarget.includes(query.toLowerCase())
-      return matchesLine && matchesQuery
+      return matchesLine && matchesType && matchesQuery
     })
-  }, [movements, parts, lineFilter, query])
+  }, [movements, parts, lineFilter, movementTypeFilter, query])
 
   // Available unique lines
   const availableLines = useMemo(() => {
@@ -187,6 +268,44 @@ export default function Page() {
     })
     return Array.from(set)
   }, [parts])
+
+  // Riwayat filtered movements
+  const riwayatFiltered = useMemo(() => {
+    return movements.filter((m) => {
+      const inDateRange = m.date >= riwayatFromDate && m.date <= riwayatToDate
+      const matchesPart = riwayatPartFilter === 'ALL' || m.partId === riwayatPartFilter
+      const matchesType = riwayatTypeFilter === 'ALL' || m.type === riwayatTypeFilter
+      const part = parts.find((p) => p.id === m.partId)
+      const searchTarget = `${m.partId} ${part?.part || ''} ${m.note} ${m.id}`.toLowerCase()
+      const matchesSearch = !riwayatSearch || searchTarget.includes(riwayatSearch.toLowerCase())
+      return inDateRange && matchesPart && matchesType && matchesSearch
+    }).sort((a, b) => {
+      // Sort by date desc, then by id desc
+      if (b.date !== a.date) return b.date.localeCompare(a.date)
+      return b.id.localeCompare(a.id)
+    })
+  }, [movements, parts, riwayatFromDate, riwayatToDate, riwayatPartFilter, riwayatTypeFilter, riwayatSearch])
+
+  const riwayatTotalPages = Math.max(1, Math.ceil(riwayatFiltered.length / RIWAYAT_PAGE_SIZE))
+  const riwayatPagedData = riwayatFiltered.slice(
+    (riwayatPage - 1) * RIWAYAT_PAGE_SIZE,
+    riwayatPage * RIWAYAT_PAGE_SIZE
+  )
+
+  function handleRiwayatSearch() {
+    setRiwayatPage(1)
+  }
+
+  function handleRiwayatReset() {
+    const d = new Date()
+    d.setDate(1)
+    setRiwayatFromDate(d.toISOString().split('T')[0])
+    setRiwayatToDate(new Date().toISOString().split('T')[0])
+    setRiwayatPartFilter('ALL')
+    setRiwayatTypeFilter('ALL')
+    setRiwayatSearch('')
+    setRiwayatPage(1)
+  }
 
   // Add Part handler
   function handleAddPart(e: React.FormEvent) {
@@ -237,6 +356,12 @@ export default function Page() {
     if (!selectedPartId && parts.length > 0) {
       setSelectedPartId(parts[0].id)
     }
+    // Set default movType according to active role
+    if (currentRole === 'RECEIVING') {
+      setMovType('IN')
+    } else if (currentRole === 'PRODUCTION') {
+      setMovType('OUT')
+    }
     setMovNote('')
     setShowMovementForm(true)
   }
@@ -246,10 +371,16 @@ export default function Page() {
     setMovNote('')
   }
 
-  // Add Movement handler
+  // Add Movement handler with Role Enforcement
   function handleAddMovement() {
     const qty = Number(movQty)
     if (!selectedPartId || !qty || qty < 1) return
+
+    // Enforce role permission
+    if (!ROLES[currentRole].allowedTypes.includes(movType)) {
+      alert(`Role ${ROLES[currentRole].name} tidak diizinkan mencatat transaksi tipe ${movType}!`)
+      return
+    }
 
     const newMov: MovementItem = {
       id: `TRX-${String(movements.length + 1).padStart(4, '0')}`,
@@ -258,6 +389,8 @@ export default function Page() {
       type: movType,
       qty,
       note: movNote.trim() || '-',
+      operator: ROLES[currentRole].name,
+      role: currentRole,
     }
 
     setMovements((prev) => [newMov, ...prev])
@@ -374,8 +507,36 @@ export default function Page() {
             <p className="text-xs font-medium text-slate-400">Production Inventory / {activePage}</p>
             <h1 className="mt-1 text-xl font-bold tracking-tight">{activePage}</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* Role Switcher Simulator */}
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-xs">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                <ShieldCheck size={14} className="text-[#a17e00]" />
+                <span className="hidden sm:inline">Role:</span>
+              </div>
+              <select
+                id="role-switcher-select"
+                value={currentRole}
+                onChange={(e) => {
+                  const newRole = e.target.value as UserRole
+                  setCurrentRole(newRole)
+                  if (newRole === 'RECEIVING') setMovType('IN')
+                  else if (newRole === 'PRODUCTION') setMovType('OUT')
+                }}
+                className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer pr-1"
+              >
+                <option value="SUPERVISOR">👑 Warehouse Admin (Full)</option>
+                <option value="RECEIVING">📥 Operator Receiving (IN)</option>
+                <option value="PRODUCTION">📤 Operator Produksi (OUT)</option>
+              </select>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ROLES[currentRole].badgeColor}`}
+              >
+                {ROLES[currentRole].label}
+              </span>
+            </div>
+
+            <span className="hidden md:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Penyimpanan Browser
             </span>
@@ -579,6 +740,16 @@ export default function Page() {
                         </option>
                       ))}
                     </select>
+
+                    <select
+                      value={movementTypeFilter}
+                      onChange={(e) => setMovementTypeFilter(e.target.value as 'ALL' | 'IN' | 'OUT')}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 outline-none"
+                    >
+                      <option value="ALL">Semua Tipe (IN & OUT)</option>
+                      <option value="IN">🟢 Barang Masuk (IN)</option>
+                      <option value="OUT">🔴 Barang Keluar (OUT)</option>
+                    </select>
                   </div>
                   <span className="text-xs text-slate-400">Total: {visibleMovements.length} transaksi</span>
                 </div>
@@ -733,6 +904,305 @@ export default function Page() {
               </div>
             </>
           )}
+
+          {/* RIWAYAT PAGE */}
+          {activePage === 'Riwayat' && (
+            <div className="riwayat-fade-in" style={{ minHeight: '80vh' }}>
+              {/* Page Hero Header */}
+              <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)' }}>
+                      <History size={18} className="text-[#202932]" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-400">Stockflow / Riwayat</p>
+                      <h2 className="text-2xl font-bold tracking-tight">Riwayat Transaksi</h2>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-400 pl-11">Log lengkap semua pergerakan stok masuk dan keluar</p>
+                </div>
+                <div className="flex items-center gap-2 pl-11 sm:pl-0">
+                  <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'rgba(244,196,48,0.1)', color: '#f4c430', border: '1px solid rgba(244,196,48,0.2)' }}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#f4c430] animate-pulse"></span>
+                    {riwayatFiltered.length} transaksi ditemukan
+                  </span>
+                </div>
+              </div>
+
+              {/* Stats Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                {/* Total Transaksi */}
+                <div className="rounded-2xl p-5 stat-glow-yellow" style={{ background: 'linear-gradient(135deg, #202932 0%, #263240 100%)', border: '1px solid rgba(244,196,48,0.15)' }}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs font-semibold mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>TOTAL TRANSAKSI</p>
+                      <p className="text-3xl font-bold" style={{ color: '#f4c430' }}>{formatNumber(riwayatFiltered.length)}</p>
+                      <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>dalam rentang tanggal dipilih</p>
+                    </div>
+                    <div className="rounded-xl p-2.5" style={{ background: 'rgba(244,196,48,0.1)' }}>
+                      <History size={20} style={{ color: '#f4c430' }} />
+                    </div>
+                  </div>
+                </div>
+                {/* Transaksi Masuk */}
+                <div className="rounded-2xl p-5 stat-glow-green" style={{ background: 'linear-gradient(135deg, #1a2920 0%, #1e3125 100%)', border: '1px solid rgba(74,222,128,0.12)' }}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs font-semibold mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>BARANG MASUK (IN)</p>
+                      <p className="text-3xl font-bold" style={{ color: '#4ade80' }}>
+                        {formatNumber(riwayatFiltered.filter(m => m.type === 'IN').reduce((s, m) => s + m.qty, 0))}
+                      </p>
+                      <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                        {riwayatFiltered.filter(m => m.type === 'IN').length} transaksi masuk
+                      </p>
+                    </div>
+                    <div className="rounded-xl p-2.5" style={{ background: 'rgba(74,222,128,0.1)' }}>
+                      <ArrowDownToLine size={20} style={{ color: '#4ade80' }} />
+                    </div>
+                  </div>
+                </div>
+                {/* Transaksi Keluar */}
+                <div className="rounded-2xl p-5 stat-glow-blue" style={{ background: 'linear-gradient(135deg, #201a1a 0%, #291e1e 100%)', border: '1px solid rgba(248,113,113,0.12)' }}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs font-semibold mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>BARANG KELUAR (OUT)</p>
+                      <p className="text-3xl font-bold" style={{ color: '#f87171' }}>
+                        {formatNumber(riwayatFiltered.filter(m => m.type === 'OUT').reduce((s, m) => s + m.qty, 0))}
+                      </p>
+                      <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                        {riwayatFiltered.filter(m => m.type === 'OUT').length} transaksi keluar
+                      </p>
+                    </div>
+                    <div className="rounded-xl p-2.5" style={{ background: 'rgba(248,113,113,0.1)' }}>
+                      <ArrowUpFromLine size={20} style={{ color: '#f87171' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Card */}
+              <div className="rounded-2xl overflow-hidden" style={{ background: '#202932', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}>
+                {/* Filter Bar */}
+                <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+                  <div className="flex flex-wrap items-end gap-3">
+                    {/* Dari Tanggal */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                        Dari Tanggal
+                      </label>
+                      <div className="relative">
+                        <Calendar size={13} className="absolute left-3 top-2.5" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                        <input
+                          id="riwayat-from-date"
+                          type="date"
+                          value={riwayatFromDate}
+                          onChange={(e) => setRiwayatFromDate(e.target.value)}
+                          className="riwayat-filter-input rounded-xl pl-8 pr-3 py-2 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sampai Tanggal */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                        Sampai Tanggal
+                      </label>
+                      <div className="relative">
+                        <Calendar size={13} className="absolute left-3 top-2.5" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                        <input
+                          id="riwayat-to-date"
+                          type="date"
+                          value={riwayatToDate}
+                          onChange={(e) => setRiwayatToDate(e.target.value)}
+                          className="riwayat-filter-input rounded-xl pl-8 pr-3 py-2 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Part Selector */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                        Item / Part
+                      </label>
+                      <select
+                        id="riwayat-part-filter"
+                        value={riwayatPartFilter}
+                        onChange={(e) => { setRiwayatPartFilter(e.target.value); setRiwayatPage(1) }}
+                        className="riwayat-filter-input rounded-xl px-3 py-2 text-xs min-w-[180px] cursor-pointer"
+                      >
+                        <option value="ALL" style={{ background: '#202932' }}>SEMUA ITEM</option>
+                        {parts.map((p) => (
+                          <option key={p.id} value={p.id} style={{ background: '#202932' }}>
+                            {p.id} — {p.part}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filter Tipe IN / OUT */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                        Tipe
+                      </label>
+                      <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <button
+                          type="button"
+                          onClick={() => { setRiwayatTypeFilter('ALL'); setRiwayatPage(1) }}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                            riwayatTypeFilter === 'ALL'
+                              ? 'bg-[#f4c430] text-[#202932] shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Semua
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setRiwayatTypeFilter('IN'); setRiwayatPage(1) }}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                            riwayatTypeFilter === 'IN'
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'text-emerald-400 hover:bg-emerald-500/10'
+                          }`}
+                        >
+                          <ArrowDownToLine size={12} /> IN
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setRiwayatTypeFilter('OUT'); setRiwayatPage(1) }}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                            riwayatTypeFilter === 'OUT'
+                              ? 'bg-rose-500 text-white shadow-sm'
+                              : 'text-rose-400 hover:bg-rose-500/10'
+                          }`}
+                        >
+                          <ArrowUpFromLine size={12} /> OUT
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Search */}
+                    <div className="flex flex-col gap-1.5 flex-1 min-w-[180px]">
+                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                        Cari
+                      </label>
+                      <div className="relative">
+                        <Search size={13} className="absolute left-3 top-2.5" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                        <input
+                          id="riwayat-search"
+                          type="text"
+                          value={riwayatSearch}
+                          onChange={(e) => { setRiwayatSearch(e.target.value); setRiwayatPage(1) }}
+                          placeholder="Cari ID, part, catatan..."
+                          className="riwayat-filter-input rounded-xl pl-8 pr-3 py-2 text-xs w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="flex gap-2 pb-0">
+                      <button
+                        id="riwayat-search-btn"
+                        onClick={handleRiwayatSearch}
+                        className="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition"
+                        style={{ background: 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)', color: '#202932' }}
+                      >
+                        <Search size={13} />
+                        Cari
+                      </button>
+                      <button
+                        id="riwayat-reset-btn"
+                        onClick={handleRiwayatReset}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition"
+                        style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)' }}
+                      >
+                        <RotateCcw size={13} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table or Empty */}
+                {riwayatFiltered.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <History size={36} style={{ color: 'rgba(255,255,255,0.15)' }} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.4)' }}>Tidak ada transaksi ditemukan</p>
+                      <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>Coba ubah filter tanggal atau pilih item yang berbeda</p>
+                    </div>
+                    <button
+                      onClick={handleRiwayatReset}
+                      className="text-xs font-bold px-4 py-2 rounded-xl transition"
+                      style={{ color: '#f4c430', background: 'rgba(244,196,48,0.08)', border: '1px solid rgba(244,196,48,0.15)' }}
+                    >
+                      Reset Filter
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <RiwayatTable
+                      movements={riwayatPagedData}
+                      parts={parts}
+                      onDelete={handleDeleteMovement}
+                      currentUser="Operator"
+                    />
+
+                    {/* Pagination */}
+                    {riwayatTotalPages > 1 && (
+                      <div className="flex items-center justify-between px-5 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                          Halaman <span style={{ color: 'rgba(255,255,255,0.6)' }}>{riwayatPage}</span> dari <span style={{ color: 'rgba(255,255,255,0.6)' }}>{riwayatTotalPages}</span>
+                          &nbsp;&middot;&nbsp;{riwayatFiltered.length} total transaksi
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            id="riwayat-prev-page"
+                            onClick={() => setRiwayatPage(p => Math.max(1, p - 1))}
+                            disabled={riwayatPage === 1}
+                            className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition disabled:opacity-30"
+                            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+                          >
+                            <ChevronLeft size={13} /> Prev
+                          </button>
+                          {Array.from({ length: Math.min(5, riwayatTotalPages) }, (_, i) => {
+                            const start = Math.max(1, Math.min(riwayatPage - 2, riwayatTotalPages - 4))
+                            const page = start + i
+                            return page <= riwayatTotalPages ? (
+                              <button
+                                key={page}
+                                onClick={() => setRiwayatPage(page)}
+                                className="w-8 h-8 rounded-xl text-xs font-bold transition"
+                                style={page === riwayatPage
+                                  ? { background: '#f4c430', color: '#202932' }
+                                  : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.07)' }
+                                }
+                              >
+                                {page}
+                              </button>
+                            ) : null
+                          })}
+                          <button
+                            id="riwayat-next-page"
+                            onClick={() => setRiwayatPage(p => Math.min(riwayatTotalPages, p + 1))}
+                            disabled={riwayatPage === riwayatTotalPages}
+                            className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition disabled:opacity-30"
+                            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+                          >
+                            Next <ChevronRight size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -810,14 +1280,24 @@ export default function Page() {
               </div>
 
               <div>
-                <span className="mb-1.5 block text-xs font-bold text-slate-600">Tipe Pergerakan</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-slate-600">Tipe Pergerakan</span>
+                  {currentRole !== 'SUPERVISOR' && (
+                    <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 flex items-center gap-1">
+                      <Lock size={10} /> Terkunci untuk {ROLES[currentRole].name}
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
+                    disabled={!ROLES[currentRole].allowedTypes.includes('IN')}
                     onClick={() => setMovType('IN')}
                     className={`rounded-lg border px-4 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition ${
                       movType === 'IN'
                         ? 'border-[#29934b] bg-[#eaf6ed] text-[#29934b] shadow-sm'
+                        : !ROLES[currentRole].allowedTypes.includes('IN')
+                        ? 'border-slate-100 bg-slate-100/70 text-slate-300 cursor-not-allowed opacity-60'
                         : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                     }`}
                   >
@@ -825,16 +1305,30 @@ export default function Page() {
                   </button>
                   <button
                     type="button"
+                    disabled={!ROLES[currentRole].allowedTypes.includes('OUT')}
                     onClick={() => setMovType('OUT')}
                     className={`rounded-lg border px-4 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition ${
                       movType === 'OUT'
                         ? 'border-[#c75a42] bg-[#fff0eb] text-[#c75a42] shadow-sm'
+                        : !ROLES[currentRole].allowedTypes.includes('OUT')
+                        ? 'border-slate-100 bg-slate-100/70 text-slate-300 cursor-not-allowed opacity-60'
                         : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                     }`}
                   >
                     <ArrowUpFromLine size={16} /> KELUAR (OUT)
                   </button>
                 </div>
+                {/* Role guidance notice */}
+                {currentRole === 'RECEIVING' && (
+                  <p className="mt-1.5 text-[11px] text-emerald-700 bg-emerald-50/70 rounded-md px-2.5 py-1 border border-emerald-100 flex items-center gap-1.5">
+                    🟢 Role <strong>Operator Receiving</strong> hanya berwenang mencatat pergerakan barang masuk (IN).
+                  </p>
+                )}
+                {currentRole === 'PRODUCTION' && (
+                  <p className="mt-1.5 text-[11px] text-rose-700 bg-rose-50/70 rounded-md px-2.5 py-1 border border-rose-100 flex items-center gap-1.5">
+                    🔴 Role <strong>Operator Produksi</strong> hanya berwenang mencatat pemakaian/pengeluaran barang (OUT).
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1227,6 +1721,197 @@ function PartTable({
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+function RiwayatTable({
+  movements,
+  parts,
+  onDelete,
+  currentUser = 'Operator',
+}: {
+  movements: MovementItem[]
+  parts: PartItem[]
+  onDelete: (id: string) => void
+  currentUser?: string
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr
+            className="text-[10px] font-bold uppercase tracking-wider"
+            style={{
+              background: 'rgba(0, 0, 0, 0.25)',
+              color: 'rgba(255, 255, 255, 0.45)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+            }}
+          >
+            <th className="px-5 py-3.5">Waktu</th>
+            <th className="px-4 py-3.5">Part Number</th>
+            <th className="px-4 py-3.5">Tipe</th>
+            <th className="px-4 py-3.5">User</th>
+            <th className="px-4 py-3.5 text-center">PO</th>
+            <th className="px-5 py-3.5 text-right">Total</th>
+            <th className="px-4 py-3.5 text-center">Aksi</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/[0.04]">
+          {movements.map((m) => {
+            const partInfo = parts.find((p) => p.id === m.partId)
+            const isIN = m.type === 'IN'
+            const userInitial = (currentUser || 'O').charAt(0).toUpperCase()
+
+            return (
+              <tr
+                key={m.id}
+                className="riwayat-table-row transition-colors group"
+              >
+                {/* Waktu */}
+                <td className="px-5 py-3.5 whitespace-nowrap">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-1 h-7 rounded-full shrink-0 ${
+                        isIN ? 'bg-emerald-400' : 'bg-rose-400'
+                      }`}
+                      style={{
+                        boxShadow: isIN
+                          ? '0 0 8px rgba(52, 211, 153, 0.4)'
+                          : '0 0 8px rgba(251, 113, 133, 0.4)',
+                      }}
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5 text-slate-200 font-semibold text-xs">
+                        <Clock size={12} className="text-slate-400" />
+                        <span>{m.date}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5 max-w-[150px] truncate">
+                        {m.note || m.id}
+                      </p>
+                    </div>
+                  </div>
+                </td>
+
+                {/* Part Number */}
+                <td className="px-4 py-3.5">
+                  <div className="flex flex-col gap-0.5">
+                    <span
+                      className="font-mono font-bold text-xs inline-block"
+                      style={{ color: '#f4c430' }}
+                    >
+                      {partInfo?.part || m.partId}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                      <span className="font-semibold text-slate-300">{m.partId}</span>
+                      {partInfo?.line && (
+                        <>
+                          <span>&middot;</span>
+                          <span className="px-1.5 py-0.2 rounded bg-white/5 text-slate-300">
+                            Line {partInfo.line}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </td>
+
+                {/* Tipe */}
+                <td className="px-4 py-3.5 whitespace-nowrap">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                      isIN
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                        : 'bg-rose-500/15 text-rose-400 border border-rose-500/20'
+                    }`}
+                  >
+                    {isIN ? (
+                      <ArrowDownToLine size={12} className="stroke-[2.5]" />
+                    ) : (
+                      <ArrowUpFromLine size={12} className="stroke-[2.5]" />
+                    )}
+                    {isIN ? 'MASUK' : 'KELUAR'}
+                  </span>
+                </td>
+
+                {/* User */}
+                <td className="px-4 py-3.5 whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0"
+                      style={{
+                        background:
+                          m.role === 'RECEIVING'
+                            ? 'linear-gradient(135deg, rgba(41,147,75,0.35) 0%, rgba(41,147,75,0.1) 100%)'
+                            : m.role === 'PRODUCTION'
+                            ? 'linear-gradient(135deg, rgba(239,68,68,0.35) 0%, rgba(239,68,68,0.1) 100%)'
+                            : 'linear-gradient(135deg, rgba(244,196,48,0.25) 0%, rgba(244,196,48,0.08) 100%)',
+                        color:
+                          m.role === 'RECEIVING'
+                            ? '#34d399'
+                            : m.role === 'PRODUCTION'
+                            ? '#f87171'
+                            : '#f4c430',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                      }}
+                    >
+                      {(m.operator || currentUser || 'O').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="text-xs font-medium text-slate-200 block">
+                        {m.operator || currentUser}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block -mt-0.5">
+                        {m.role && ROLES[m.role as UserRole]
+                          ? ROLES[m.role as UserRole].label
+                          : 'Operator Gudang'}
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                {/* PO */}
+                <td className="px-4 py-3.5 text-center text-slate-400 font-mono">
+                  —
+                </td>
+
+                {/* Total */}
+                <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                  <span
+                    className={`font-mono font-bold text-sm ${
+                      isIN ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {isIN ? '+' : '-'}
+                    {formatNumber(m.qty)}
+                  </span>
+                  <span className="text-[10px] text-slate-400 ml-1">pcs</span>
+                </td>
+
+                {/* Aksi */}
+                <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                  <div className="flex items-center justify-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => alert(`Detail Mutasi ${m.id}:\nPart: ${partInfo?.part || m.partId}\nTipe: ${m.type}\nQty: ${m.qty}\nTanggal: ${m.date}\nCatatan: ${m.note || '-'}`)}
+                      title="Edit / Detail catatan transaksi"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-[#f4c430] hover:bg-white/5 transition"
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(m.id)}
+                      title="Hapus transaksi"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
