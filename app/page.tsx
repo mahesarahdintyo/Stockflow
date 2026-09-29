@@ -1065,7 +1065,7 @@ export default function Page() {
               ref={tvContainerRef}
               className={
                 isTvFullscreen
-                  ? 'fixed inset-0 z-50 bg-[#0b1320] text-slate-100 overflow-y-auto p-4 sm:p-7 flex flex-col min-h-screen'
+                  ? 'fixed inset-0 z-50 bg-[#0b1320] text-slate-100 flex flex-col h-screen overflow-hidden p-4 sm:p-6'
                   : 'relative'
               }
             >
@@ -1174,8 +1174,11 @@ export default function Page() {
                 </div>
               )}
 
+              {/* Non-table content: shrink-0 in TV mode so it doesn't steal height from the table */}
+              <div className={isTvFullscreen ? 'shrink-0' : ''}>
+
               {/* View Switcher & Quick Stat Badges */}
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div className={`inline-flex rounded-xl p-1 border ${isTvFullscreen ? 'bg-slate-900 border-slate-700' : 'bg-slate-200/80 border-slate-300'}`}>
                   <button
                     type="button"
@@ -1398,21 +1401,30 @@ export default function Page() {
               </div>
 
               {/* Hint Scroll Banner */}
-              <div className="bg-[#e0f7fa] border border-[#80deea] text-[#006064] px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs mb-4">
-                <ArrowLeftRight size={16} className="text-[#00838f] shrink-0" />
+              <div className={`border px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs mb-3 ${
+                isTvFullscreen
+                  ? 'bg-slate-900 border-slate-700 text-slate-400'
+                  : 'bg-[#e0f7fa] border-[#80deea] text-[#006064]'
+              }`}>
+                <ArrowLeftRight size={14} className={`shrink-0 ${isTvFullscreen ? 'text-slate-500' : 'text-[#00838f]'}`} />
                 <span>
-                  Geser tabel ke kanan atau kiri untuk melihat seluruh tanggal (01 s/d {monthMeta.daysCount} {monthMeta.labelIndo}).
+                  {isTvFullscreen
+                    ? `Geser kanan/kiri untuk tanggal, atas/bawah untuk semua part — ${monthMeta.daysCount} hari tampil.`
+                    : `Geser tabel ke kanan atau kiri untuk melihat seluruh tanggal (01 s/d ${monthMeta.daysCount} ${monthMeta.labelIndo}).`
+                  }
                 </span>
               </div>
+
+              </div> {/* end shrink-0 wrapper */}
 
               {/* Main Content Area */}
               {stockMovementView === 'matrix' ? (
                 /* ── MONTHLY MATRIX TABLE (IN / OUT / SISA only, AWAL is in front) ── */
-                <div className={`rounded-2xl border shadow-md overflow-hidden ${isTvFullscreen ? 'border-slate-700 bg-slate-950' : 'border-slate-300 bg-white'}`}>
-                  <div className="overflow-x-auto relative">
+                <div className={`rounded-2xl border shadow-md overflow-hidden flex flex-col ${isTvFullscreen ? 'border-slate-700 bg-slate-950 flex-1 min-h-0' : 'border-slate-300 bg-white'}`}>
+                  <div className={`${isTvFullscreen ? 'flex-1 min-h-0 overflow-auto' : 'overflow-x-auto'}`}>
                     <table className="w-full text-left border-collapse text-xs">
                       {/* Dark table header */}
-                      <thead>
+                      <thead className={isTvFullscreen ? 'sticky top-0 z-30' : ''}>
                         <tr className="bg-[#17202b] text-white border-b border-slate-700 text-[11px] font-bold">
                           {/* Sticky Item / Data Header */}
                           <th className="sticky left-0 z-30 bg-[#17202b] px-4 py-3.5 min-w-[210px] sm:min-w-[230px] border-r border-slate-700 shadow-[2px_0_6px_rgba(0,0,0,0.25)]">
