@@ -991,7 +991,7 @@ export default function Page() {
         <div className="mx-auto max-w-[1440px] p-5 sm:p-9">
           {/* DASHBOARD PAGE */}
           {activePage === 'Dashboard' && (
-            <>
+            <div className="tab-fade-in">
               <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
                   <p className="mb-1 text-sm text-slate-500">Overview pergerakan stok real-time</p>
@@ -1143,7 +1143,7 @@ export default function Page() {
                   onAddNew={handleOpenPartForm}
                 />
               </section>
-            </>
+            </div>
           )}
 
           {/* STOCK MOVEMENT (STOCK BULANAN) PAGE */}
@@ -1153,7 +1153,7 @@ export default function Page() {
               className={
                 isTvFullscreen
                   ? 'fixed inset-0 z-50 bg-[#0b1320] text-slate-100 flex flex-col h-screen overflow-hidden p-4 sm:p-6'
-                  : 'relative'
+                  : 'relative tab-fade-in'
               }
             >
               {/* Specialized Fullscreen TV 52" Header (when in TV Mode) */}
@@ -1808,7 +1808,7 @@ export default function Page() {
 
           {/* MASTER PART PAGE */}
           {activePage === 'Master Part' && (
-            <>
+            <div className="tab-fade-in">
               <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
                   <p className="mb-1 text-sm text-slate-500">Database spesifikasi & stok awal material</p>
@@ -1849,12 +1849,12 @@ export default function Page() {
                   onAddNew={handleOpenPartForm}
                 />
               </div>
-            </>
+            </div>
           )}
 
           {/* REPORT PAGE */}
           {activePage === 'Report' && (
-            <>
+            <div className="tab-fade-in">
               <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
                   <p className="mb-1 text-sm text-slate-500">Laporan akumulasi mutasi dan saldo akhir</p>
@@ -1945,7 +1945,7 @@ export default function Page() {
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* RIWAYAT PAGE */}
