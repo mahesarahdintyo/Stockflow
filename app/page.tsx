@@ -4,6 +4,7 @@ import React, { useMemo, useState, useEffect, useRef, Fragment } from 'react'
 import {
   ArrowDownToLine,
   ArrowLeftRight,
+  ArrowUpDown,
   ArrowUpFromLine,
   BarChart3,
   Bell,
@@ -61,6 +62,7 @@ export interface MovementItem {
 }
 
 export type UserRole = 'RECEIVING' | 'PRODUCTION' | 'SUPERVISOR'
+export type MonthlySortField = 'id' | 'part' | 'line' | 'stokAwal' | 'totalIn' | 'totalOut' | 'finalSisa' | 'currentStock'
 
 export interface RoleConfig {
   id: UserRole
@@ -208,6 +210,8 @@ export default function Page() {
   const [monthlyLineFilter, setMonthlyLineFilter] = useState('All lines')
   const [monthlySearch, setMonthlySearch] = useState('')
   const [stockMovementView, setStockMovementView] = useState<'matrix' | 'list'>('matrix')
+  const [monthlySortField, setMonthlySortField] = useState<MonthlySortField>('id')
+  const [monthlySortDir, setMonthlySortDir] = useState<'asc' | 'desc'>('asc')
 
   // Fullscreen TV 52" mode
   const [isTvFullscreen, setIsTvFullscreen] = useState(false)
@@ -228,6 +232,7 @@ export default function Page() {
   }, [])
 
   function handleToggleTvFullscreen() {
+    setStockMovementView('matrix')
     if (!document.fullscreenElement) {
       if (tvContainerRef.current?.requestFullscreen) {
         tvContainerRef.current.requestFullscreen().catch(() => {
@@ -531,7 +536,7 @@ export default function Page() {
     const monthStartStr = `${selectedMonth}-01`
     const todayStr = getLocalDateString()
 
-    return filteredMonthlyParts.map((p) => {
+    const rawList = filteredMonthlyParts.map((p) => {
       // 1. Calculate opening balance as of the first day of selectedMonth
       let priorStock = p.opening
       for (const m of movements) {
@@ -598,7 +603,33 @@ export default function Page() {
         finalSisa,
       }
     })
-  }, [filteredMonthlyParts, movements, selectedMonth, monthMeta])
+
+    return rawList.sort((a, b) => {
+      let cmp = 0
+      if (monthlySortField === 'id') {
+        cmp = a.part.id.localeCompare(b.part.id, undefined, { numeric: true })
+      } else if (monthlySortField === 'part') {
+        cmp = a.part.part.localeCompare(b.part.part)
+      } else if (monthlySortField === 'line') {
+        cmp = a.part.line.localeCompare(b.part.line, undefined, { numeric: true })
+      } else if (monthlySortField === 'stokAwal') {
+        const stockA = a.daily[0]?.awal ?? a.priorStock
+        const stockB = b.daily[0]?.awal ?? b.priorStock
+        cmp = stockA - stockB
+      } else if (monthlySortField === 'totalIn') {
+        cmp = a.totalIn - b.totalIn
+      } else if (monthlySortField === 'totalOut') {
+        cmp = a.totalOut - b.totalOut
+      } else if (monthlySortField === 'finalSisa') {
+        cmp = a.finalSisa - b.finalSisa
+      } else if (monthlySortField === 'currentStock') {
+        const stockA = partStats[a.part.id]?.currentStock ?? a.part.opening
+        const stockB = partStats[b.part.id]?.currentStock ?? b.part.opening
+        cmp = stockA - stockB
+      }
+      return monthlySortDir === 'asc' ? cmp : -cmp
+    })
+  }, [filteredMonthlyParts, movements, selectedMonth, monthMeta, monthlySortField, monthlySortDir, partStats])
 
   // Summary stats for monthly matrix
   const monthlyTotals = useMemo(() => {
@@ -1152,62 +1183,99 @@ export default function Page() {
               ref={tvContainerRef}
               className={
                 isTvFullscreen
-                  ? 'fixed inset-0 z-50 bg-[#0b1320] text-slate-100 flex flex-col h-screen overflow-hidden p-4 sm:p-6'
+                  ? 'fixed inset-0 z-50 bg-[#0b1320] text-slate-100 flex flex-col h-screen overflow-hidden p-2 sm:p-3'
                   : 'relative tab-fade-in'
               }
             >
-              {/* Specialized Fullscreen TV 52" Header (when in TV Mode) */}
+              {/* Specialized Fullscreen TV 52" Compact Top Bar (when in TV Mode) */}
               {isTvFullscreen ? (
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-4 bg-slate-900/95 border border-slate-700/80 p-4 sm:p-5 rounded-2xl shadow-2xl">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400/20 text-amber-400 border border-amber-400/30">
-                      <Tv size={26} strokeWidth={2.5} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h1 className="text-xl sm:text-2xl font-black tracking-wider uppercase text-white">
-                          ANDON PRODUCTION MONITORING &bull; STOCK BULANAN
-                        </h1>
-                        <span className="rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3 py-0.5 text-xs font-bold text-emerald-400">
-                          TV 52&quot; DISPLAY
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Pusat Kontrol Persediaan Material &bull; Periode: <strong className="text-amber-300">{monthMeta.labelIndo}</strong> ({monthMeta.daysCount} Hari)
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Digital Clock in Center */}
-                  <div className="flex items-center gap-3 bg-slate-950/90 border border-slate-800 px-5 py-2.5 rounded-xl shadow-inner">
-                    <Clock size={22} className="text-amber-400 animate-pulse" />
-                    <div>
-                      <div className="font-mono font-black text-2xl tracking-widest text-amber-300">
-                        {currentClock.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}{' '}
-                        <span className="text-xs font-semibold text-slate-400">WIB</span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 font-medium">
-                        {currentClock.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action buttons in Fullscreen */}
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2.5 bg-slate-900/95 border border-slate-700/80 px-3.5 py-1.5 rounded-xl shadow-xl shrink-0">
                   <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/20 text-amber-400 border border-amber-400/30">
+                      <Tv size={17} strokeWidth={2.5} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xs sm:text-sm font-black tracking-wider uppercase text-white">
+                        ANDON TV 52&quot; &bull; STOCK BULANAN
+                      </h1>
+                      <span className="rounded-full bg-emerald-500/20 border border-emerald-400/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                        {monthMeta.labelIndo} ({monthlyMatrixData.length} Part)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Sorting & Filter controls directly on TV Top Bar */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 bg-slate-950/90 border border-slate-700 px-2 py-1 rounded-lg">
+                      <ArrowUpDown size={13} className="text-amber-400" />
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">Sortir:</span>
+                      <select
+                        value={monthlySortField}
+                        onChange={(e) => setMonthlySortField(e.target.value as MonthlySortField)}
+                        className="h-7 rounded bg-slate-900 border border-slate-700 px-2 text-xs font-semibold text-white outline-none focus:border-amber-400 cursor-pointer"
+                      >
+                        <option value="id">Kode Part</option>
+                        <option value="part">Nama Part</option>
+                        <option value="line">Line</option>
+                        <option value="finalSisa">Sisa Stok Akhir</option>
+                        <option value="currentStock">⚡ Stok Terkini</option>
+                        <option value="totalIn">Total Masuk (IN)</option>
+                        <option value="totalOut">Total Keluar (OUT)</option>
+                        <option value="stokAwal">Stok Awal Bulan</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setMonthlySortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                        title={monthlySortDir === 'asc' ? 'Urutan: Naik (A-Z / Terkecil)' : 'Urutan: Turun (Z-A / Terbesar)'}
+                        className="h-7 px-2 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-bold flex items-center gap-1 transition active:scale-95"
+                      >
+                        {monthlySortDir === 'asc' ? '↑ Naik' : '↓ Turun'}
+                      </button>
+                    </div>
+
+                    {/* Quick Line filter for TV */}
+                    <div className="hidden md:flex items-center gap-1.5 bg-slate-950/90 border border-slate-700 px-2 py-1 rounded-lg">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Line:</span>
+                      <select
+                        value={monthlyLineFilter}
+                        onChange={(e) => setMonthlyLineFilter(e.target.value)}
+                        className="h-7 rounded bg-slate-900 border border-slate-700 px-2 text-xs font-semibold text-white outline-none focus:border-amber-400 cursor-pointer"
+                      >
+                        <option value="All lines">Semua Line</option>
+                        {availableLines.map((l) => (
+                          <option key={l} value={l}>
+                            Line {l}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Digital Clock & Actions */}
+                  <div className="flex items-center gap-2">
+                    <div className="hidden lg:flex items-center gap-2 bg-slate-950/90 border border-slate-800 px-2.5 py-1 rounded-lg">
+                      <Clock size={13} className="text-amber-400 animate-pulse" />
+                      <span className="font-mono font-bold text-xs tracking-wider text-amber-300">
+                        {currentClock.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}{' '}
+                        <span className="text-[10px] text-slate-400">WIB</span>
+                      </span>
+                    </div>
+
                     <button
                       type="button"
                       onClick={handleExportMonthlyStockExcel}
-                      className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition active:scale-95"
+                      title="Export Excel"
+                      className="h-8 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1 shadow-sm transition active:scale-95"
                     >
-                      <FileSpreadsheet size={16} />
-                      <span>Export Excel</span>
+                      <FileSpreadsheet size={14} />
+                      <span className="hidden sm:inline">Excel</span>
                     </button>
                     <button
                       type="button"
                       onClick={handleToggleTvFullscreen}
-                      className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition active:scale-95"
+                      className="h-8 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition active:scale-95"
                     >
-                      <Minimize2 size={16} />
+                      <Minimize2 size={14} />
                       <span>Keluar (Esc)</span>
                     </button>
                   </div>
@@ -1261,248 +1329,236 @@ export default function Page() {
                 </div>
               )}
 
-              {/* Non-table content: shrink-0 in TV mode so it doesn't steal height from the table */}
-              <div className={isTvFullscreen ? 'shrink-0' : ''}>
-
-              {/* View Switcher & Quick Stat Badges */}
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div className={`inline-flex rounded-xl p-1 border ${isTvFullscreen ? 'bg-slate-900 border-slate-700' : 'bg-slate-200/80 border-slate-300'}`}>
-                  <button
-                    type="button"
-                    onClick={() => setStockMovementView('matrix')}
-                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
-                      stockMovementView === 'matrix'
-                        ? isTvFullscreen
-                          ? 'bg-amber-400 text-slate-950 shadow-sm'
-                          : 'bg-white text-slate-900 shadow-sm'
-                        : isTvFullscreen
-                        ? 'text-slate-400 hover:text-white'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <FileSpreadsheet size={14} className={stockMovementView === 'matrix' && !isTvFullscreen ? 'text-emerald-600' : ''} />
-                    Matriks Bulanan (Tabel Harian)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStockMovementView('list')}
-                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
-                      stockMovementView === 'list'
-                        ? isTvFullscreen
-                          ? 'bg-amber-400 text-slate-950 shadow-sm'
-                          : 'bg-white text-slate-900 shadow-sm'
-                        : isTvFullscreen
-                        ? 'text-slate-400 hover:text-white'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <History size={14} className={stockMovementView === 'list' && !isTvFullscreen ? 'text-indigo-600' : ''} />
-                    Log Daftar Mutasi
-                  </button>
-                </div>
-
-                <div className={`flex items-center gap-2 text-xs font-medium ${isTvFullscreen ? 'text-slate-300' : 'text-slate-500'}`}>
-                  <span>Periode Aktif:</span>
-                  <span className={`font-bold px-2.5 py-1 rounded-lg border shadow-xs ${isTvFullscreen ? 'bg-slate-900 text-amber-300 border-slate-700' : 'bg-white text-slate-800 border-slate-200'}`}>
-                    📅 {monthMeta.labelIndo} ({monthMeta.daysCount} Hari)
-                  </span>
-                </div>
-              </div>
-
-              {/* Filter Card (Matching user screenshot) */}
-              <div className={`rounded-2xl border p-5 shadow-sm mb-5 ${isTvFullscreen ? 'bg-slate-900/90 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'}`}>
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                  {/* BULAN */}
-                  <div className="md:col-span-4 space-y-1.5">
-                    <label className={`text-[11px] font-bold uppercase tracking-wider block ${isTvFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>
-                      BULAN
-                    </label>
-                    <div className="flex items-center gap-1.5">
+              {/* Non-table content: Only rendered when NOT in TV Fullscreen to maximize screen space for TV */}
+              {!isTvFullscreen && (
+                <div>
+                  {/* View Switcher & Quick Stat Badges */}
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="inline-flex rounded-xl p-1 border bg-slate-200/80 border-slate-300">
                       <button
                         type="button"
-                        onClick={handlePrevMonth}
-                        title="Bulan Sebelumnya"
-                        className={`h-10 w-9 rounded-xl border flex items-center justify-center font-bold active:scale-95 transition ${
-                          isTvFullscreen
-                            ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
-                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600'
+                        onClick={() => setStockMovementView('matrix')}
+                        className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                          stockMovementView === 'matrix'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        <ChevronLeft size={16} />
-                      </button>
-                      <div className="relative flex-1">
-                        <input
-                          type="month"
-                          value={selectedMonth}
-                          onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-                          className={`w-full h-10 rounded-xl border px-3 font-semibold text-xs outline-none ${
-                            isTvFullscreen
-                              ? 'border-slate-700 bg-slate-950 text-white focus:border-amber-400'
-                              : 'border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]'
-                          }`}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleNextMonth}
-                        title="Bulan Berikutnya"
-                        className={`h-10 w-9 rounded-xl border flex items-center justify-center font-bold active:scale-95 transition ${
-                          isTvFullscreen
-                            ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
-                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        <ChevronRight size={16} />
+                        <FileSpreadsheet size={14} className={stockMovementView === 'matrix' ? 'text-emerald-600' : ''} />
+                        Matriks Bulanan (Tabel Harian)
                       </button>
                       <button
                         type="button"
-                        onClick={handleCurrentMonth}
-                        title="Kembali ke Bulan Berjalan"
-                        className={`h-10 px-2.5 rounded-xl border font-bold text-[10px] active:scale-95 transition ${
-                          isTvFullscreen
-                            ? 'border-slate-700 bg-slate-800 hover:bg-slate-700 text-amber-300'
-                            : 'border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        onClick={() => setStockMovementView('list')}
+                        className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                          stockMovementView === 'list'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        Bulan Ini
+                        <History size={14} className={stockMovementView === 'list' ? 'text-indigo-600' : ''} />
+                        Log Daftar Mutasi
                       </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                      <span>Periode Aktif:</span>
+                      <span className="font-bold px-2.5 py-1 rounded-lg border shadow-xs bg-white text-slate-800 border-slate-200">
+                        📅 {monthMeta.labelIndo} ({monthMeta.daysCount} Hari)
+                      </span>
                     </div>
                   </div>
 
-                  {/* ITEM (STANDAR: SEMUA ITEM) */}
-                  <div className="md:col-span-3 space-y-1.5">
-                    <label className={`text-[11px] font-bold uppercase tracking-wider block ${isTvFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>
-                      ITEM (STANDAR: SEMUA ITEM)
-                    </label>
-                    <select
-                      value={monthlyItemFilter}
-                      onChange={(e) => setMonthlyItemFilter(e.target.value)}
-                      className={`w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none ${
-                        isTvFullscreen
-                          ? 'border-slate-700 bg-slate-950 text-white focus:border-amber-400'
-                          : 'border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]'
-                      }`}
-                    >
-                      <option value="ALL">SEMUA ITEM</option>
-                      {parts.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.id} - {p.part} (Line {p.line})
-                        </option>
-                      ))}
-                    </select>
+                  {/* Filter Card */}
+                  <div className="rounded-2xl border p-5 shadow-sm mb-5 bg-white border-slate-200 text-slate-800">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                      {/* BULAN */}
+                      <div className="md:col-span-4 space-y-1.5">
+                        <label className="text-[11px] font-bold uppercase tracking-wider block text-slate-500">
+                          BULAN
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handlePrevMonth}
+                            title="Bulan Sebelumnya"
+                            className="h-10 w-9 rounded-xl border flex items-center justify-center font-bold active:scale-95 transition border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600"
+                          >
+                            <ChevronLeft size={16} />
+                          </button>
+                          <div className="relative flex-1">
+                            <input
+                              type="month"
+                              value={selectedMonth}
+                              onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+                              className="w-full h-10 rounded-xl border px-3 font-semibold text-xs outline-none border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleNextMonth}
+                            title="Bulan Berikutnya"
+                            className="h-10 w-9 rounded-xl border flex items-center justify-center font-bold active:scale-95 transition border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCurrentMonth}
+                            title="Kembali ke Bulan Berjalan"
+                            className="h-10 px-2.5 rounded-xl border font-bold text-[10px] active:scale-95 transition border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700"
+                          >
+                            Bulan Ini
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* ITEM (STANDAR: SEMUA ITEM) */}
+                      <div className="md:col-span-3 space-y-1.5">
+                        <label className="text-[11px] font-bold uppercase tracking-wider block text-slate-500">
+                          ITEM (STANDAR: SEMUA ITEM)
+                        </label>
+                        <select
+                          value={monthlyItemFilter}
+                          onChange={(e) => setMonthlyItemFilter(e.target.value)}
+                          className="w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]"
+                        >
+                          <option value="ALL">SEMUA ITEM</option>
+                          {parts.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.id} - {p.part} (Line {p.line})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* LINE FILTER */}
+                      <div className="md:col-span-2 space-y-1.5">
+                        <label className="text-[11px] font-bold uppercase tracking-wider block text-slate-500">
+                          LINE
+                        </label>
+                        <select
+                          value={monthlyLineFilter}
+                          onChange={(e) => setMonthlyLineFilter(e.target.value)}
+                          className="w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]"
+                        >
+                          <option value="All lines">Semua Line</option>
+                          {availableLines.map((l) => (
+                            <option key={l} value={l}>
+                              Line {l}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* EXPORT EXCEL BUTTON */}
+                      <div className="md:col-span-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleExportMonthlyStockExcel}
+                          className="w-full h-10 rounded-xl bg-[#107c41] hover:bg-[#0c6233] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition active:scale-95"
+                        >
+                          <FileSpreadsheet size={16} />
+                          <span>EXPORT EXCEL</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Search bar & Sortir */}
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="relative w-full sm:w-64">
+                          <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                          <input
+                            value={monthlySearch}
+                            onChange={(e) => setMonthlySearch(e.target.value)}
+                            placeholder="Cari part number, nama, spec..."
+                            className="w-full h-9 rounded-lg border border-slate-200 bg-white text-slate-800 focus:border-[#f4c430] pl-8 pr-3 text-xs outline-none"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                            <ArrowUpDown size={12} className="text-amber-500" /> Sortir:
+                          </span>
+                          <select
+                            value={monthlySortField}
+                            onChange={(e) => setMonthlySortField(e.target.value as MonthlySortField)}
+                            className="h-9 rounded-lg border border-slate-200 bg-white text-slate-800 px-2.5 text-xs font-semibold outline-none focus:border-[#f4c430]"
+                          >
+                            <option value="id">Kode Part</option>
+                            <option value="part">Nama Part</option>
+                            <option value="line">Line</option>
+                            <option value="finalSisa">Sisa Stok Akhir</option>
+                            <option value="currentStock">⚡ Stok Terkini</option>
+                            <option value="totalIn">Total Masuk (IN)</option>
+                            <option value="totalOut">Total Keluar (OUT)</option>
+                            <option value="stokAwal">Stok Awal Bulan</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => setMonthlySortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                            className="h-9 px-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition active:scale-95"
+                            title={monthlySortDir === 'asc' ? 'Urutan: Naik (Asc)' : 'Urutan: Turun (Desc)'}
+                          >
+                            {monthlySortDir === 'asc' ? '↑ Naik' : '↓ Turun'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span>
+                          Menampilkan <strong className="text-slate-800">{filteredMonthlyParts.length}</strong> dari{' '}
+                          <strong className="text-slate-800">{parts.length}</strong> part
+                        </span>
+                        {(monthlyItemFilter !== 'ALL' || monthlyLineFilter !== 'All lines' || monthlySearch) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMonthlyItemFilter('ALL')
+                              setMonthlyLineFilter('All lines')
+                              setMonthlySearch('')
+                            }}
+                            className="text-amber-500 hover:underline font-bold text-xs"
+                          >
+                            Reset Filter
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* LINE FILTER */}
-                  <div className="md:col-span-2 space-y-1.5">
-                    <label className={`text-[11px] font-bold uppercase tracking-wider block ${isTvFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>
-                      LINE
-                    </label>
-                    <select
-                      value={monthlyLineFilter}
-                      onChange={(e) => setMonthlyLineFilter(e.target.value)}
-                      className={`w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none ${
-                        isTvFullscreen
-                          ? 'border-slate-700 bg-slate-950 text-white focus:border-amber-400'
-                          : 'border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]'
-                      }`}
-                    >
-                      <option value="All lines">Semua Line</option>
-                      {availableLines.map((l) => (
-                        <option key={l} value={l}>
-                          Line {l}
-                        </option>
-                      ))}
-                    </select>
+                  {/* Monthly Summary Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                    <div className="rounded-xl border p-3.5 shadow-xs bg-white border-slate-200">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material</p>
+                      <p className="text-lg sm:text-xl font-black mt-0.5 text-slate-800">
+                        {monthlyTotals.totalParts} Item
+                      </p>
+                    </div>
+                    <div className="rounded-xl border p-3.5 shadow-xs bg-emerald-50/50 border-emerald-100">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Total Masuk (IN)</p>
+                      <p className="text-lg sm:text-xl font-black text-emerald-500 mt-0.5">+{formatNumber(monthlyTotals.totalIn)} pcs</p>
+                    </div>
+                    <div className="rounded-xl border p-3.5 shadow-xs bg-rose-50/50 border-rose-100">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Total Keluar (OUT)</p>
+                      <p className="text-lg sm:text-xl font-black text-rose-500 mt-0.5">-{formatNumber(monthlyTotals.totalOut)} pcs</p>
+                    </div>
+                    <div className="rounded-xl border p-3.5 shadow-xs bg-blue-50/50 border-blue-100">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Saldo Akhir Bulan</p>
+                      <p className="text-lg sm:text-xl font-black text-blue-400 mt-0.5">{formatNumber(monthlyTotals.totalFinalStock)} pcs</p>
+                    </div>
                   </div>
 
-                  {/* EXPORT EXCEL BUTTON */}
-                  <div className="md:col-span-3 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={handleExportMonthlyStockExcel}
-                      className="w-full h-10 rounded-xl bg-[#107c41] hover:bg-[#0c6233] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition active:scale-95"
-                    >
-                      <FileSpreadsheet size={16} />
-                      <span>EXPORT EXCEL</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Optional Quick Search bar */}
-                <div className={`mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-3 text-xs ${isTvFullscreen ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'}`}>
-                  <div className="relative w-full sm:w-72">
-                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                    <input
-                      value={monthlySearch}
-                      onChange={(e) => setMonthlySearch(e.target.value)}
-                      placeholder="Cari part number, nama, spec..."
-                      className={`w-full h-9 rounded-lg border pl-8 pr-3 text-xs outline-none ${
-                        isTvFullscreen
-                          ? 'border-slate-700 bg-slate-950 text-white focus:border-amber-400'
-                          : 'border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]'
-                      }`}
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
+                  {/* Hint Scroll Banner */}
+                  <div className="border px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs mb-3 bg-[#e0f7fa] border-[#80deea] text-[#006064]">
+                    <ArrowLeftRight size={14} className="shrink-0 text-[#00838f]" />
                     <span>
-                      Menampilkan <strong className={isTvFullscreen ? 'text-white' : 'text-slate-800'}>{filteredMonthlyParts.length}</strong> dari{' '}
-                      <strong className={isTvFullscreen ? 'text-white' : 'text-slate-800'}>{parts.length}</strong> part
+                      Geser tabel ke kanan atau kiri untuk melihat seluruh tanggal (01 s/d {monthMeta.daysCount} {monthMeta.labelIndo}).
                     </span>
-                    {(monthlyItemFilter !== 'ALL' || monthlyLineFilter !== 'All lines' || monthlySearch) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMonthlyItemFilter('ALL')
-                          setMonthlyLineFilter('All lines')
-                          setMonthlySearch('')
-                        }}
-                        className="text-amber-500 hover:underline font-bold text-xs"
-                      >
-                        Reset Filter
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
-
-              {/* Monthly Summary Metric Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                <div className={`rounded-xl border p-3.5 shadow-xs ${isTvFullscreen ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material</p>
-                  <p className={`text-lg sm:text-xl font-black mt-0.5 ${isTvFullscreen ? 'text-white' : 'text-slate-800'}`}>
-                    {monthlyTotals.totalParts} Item
-                  </p>
-                </div>
-                <div className={`rounded-xl border p-3.5 shadow-xs ${isTvFullscreen ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/50 border-emerald-100'}`}>
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isTvFullscreen ? 'text-emerald-400' : 'text-emerald-700'}`}>Total Masuk (IN)</p>
-                  <p className="text-lg sm:text-xl font-black text-emerald-500 mt-0.5">+{formatNumber(monthlyTotals.totalIn)} pcs</p>
-                </div>
-                <div className={`rounded-xl border p-3.5 shadow-xs ${isTvFullscreen ? 'bg-rose-950/40 border-rose-800/60' : 'bg-rose-50/50 border-rose-100'}`}>
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isTvFullscreen ? 'text-rose-400' : 'text-rose-700'}`}>Total Keluar (OUT)</p>
-                  <p className="text-lg sm:text-xl font-black text-rose-500 mt-0.5">-{formatNumber(monthlyTotals.totalOut)} pcs</p>
-                </div>
-                <div className={`rounded-xl border p-3.5 shadow-xs ${isTvFullscreen ? 'bg-blue-950/40 border-blue-800/60' : 'bg-blue-50/50 border-blue-100'}`}>
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isTvFullscreen ? 'text-blue-400' : 'text-blue-700'}`}>Saldo Akhir Bulan</p>
-                  <p className="text-lg sm:text-xl font-black text-blue-400 mt-0.5">{formatNumber(monthlyTotals.totalFinalStock)} pcs</p>
-                </div>
-              </div>
-
-              {/* Hint Scroll Banner */}
-              <div className={`border px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs mb-3 ${
-                isTvFullscreen
-                  ? 'bg-slate-900 border-slate-700 text-slate-400'
-                  : 'bg-[#e0f7fa] border-[#80deea] text-[#006064]'
-              }`}>
-                <ArrowLeftRight size={14} className={`shrink-0 ${isTvFullscreen ? 'text-slate-500' : 'text-[#00838f]'}`} />
-                <span>
-                  {isTvFullscreen
-                    ? `Geser kanan/kiri untuk tanggal, atas/bawah untuk semua part — ${monthMeta.daysCount} hari tampil.`
-                    : `Geser tabel ke kanan atau kiri untuk melihat seluruh tanggal (01 s/d ${monthMeta.daysCount} ${monthMeta.labelIndo}).`
-                  }
-                </span>
-              </div>
-
-              </div> {/* end shrink-0 wrapper */}
+              )}
 
               {/* Main Content Area */}
               {stockMovementView === 'matrix' ? (
@@ -1511,11 +1567,31 @@ export default function Page() {
                   <div className={`${isTvFullscreen ? 'flex-1 min-h-0 overflow-auto' : 'overflow-x-auto'}`}>
                     <table className="w-full text-left border-collapse text-xs">
                       {/* Dark table header */}
-                      <thead className={isTvFullscreen ? 'sticky top-0 z-30' : ''}>
+                      <thead className="sticky top-0 z-30">
                         <tr className="bg-[#17202b] text-white border-b border-slate-700 text-[11px] font-bold">
                           {/* Sticky Item / Data Header */}
-                          <th className="sticky left-0 z-30 bg-[#17202b] px-4 py-3.5 min-w-[210px] sm:min-w-[230px] border-r border-slate-700 shadow-[2px_0_6px_rgba(0,0,0,0.25)]">
-                            <span className="tracking-wider uppercase text-slate-200">ITEM / DATA</span>
+                          <th
+                            onClick={() => {
+                              if (monthlySortField === 'part') {
+                                setMonthlySortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                              } else {
+                                setMonthlySortField('part')
+                                setMonthlySortDir('asc')
+                              }
+                            }}
+                            className="sticky left-0 top-0 z-40 bg-[#17202b] px-4 py-3.5 min-w-[210px] sm:min-w-[230px] border-r border-slate-700 shadow-[2px_0_6px_rgba(0,0,0,0.25)] cursor-pointer select-none hover:bg-slate-800 transition"
+                            title="Klik untuk sortir berdasarkan Nama Part"
+                          >
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="tracking-wider uppercase text-slate-200">ITEM / DATA</span>
+                              <span className="flex items-center text-xs">
+                                {monthlySortField === 'part' || monthlySortField === 'id' ? (
+                                  <span className="text-amber-400 font-extrabold">{monthlySortDir === 'asc' ? '▲' : '▼'}</span>
+                                ) : (
+                                  <ArrowUpDown size={12} className="text-slate-500 opacity-60" />
+                                )}
+                              </span>
+                            </div>
                           </th>
 
                           {/* Day Columns 01..31 */}
@@ -1528,12 +1604,12 @@ export default function Page() {
                             return (
                               <th
                                 key={dayNum}
-                                className={`px-2 py-3 text-center min-w-[58px] border-r border-slate-700/60 transition ${
+                                className={`sticky top-0 z-30 px-2 py-3 text-center min-w-[58px] border-r border-slate-700/60 transition ${
                                   isToday
-                                    ? 'bg-amber-500/25 text-[#f4c430] border-t-2 border-t-[#f4c430]'
+                                    ? 'bg-amber-950/80 text-[#f4c430] border-t-2 border-t-[#f4c430]'
                                     : isWeekend
-                                    ? 'bg-slate-800/60 text-slate-400'
-                                    : 'text-slate-200'
+                                    ? 'bg-slate-800 text-slate-400'
+                                    : 'bg-[#17202b] text-slate-200'
                                 }`}
                               >
                                 <div className={`font-mono ${isTvFullscreen ? 'text-[13px] font-black' : 'text-[12px] font-bold'}`}>
@@ -1547,14 +1623,68 @@ export default function Page() {
                           })}
 
                           {/* Summary Columns */}
-                          <th className="px-3 py-3 text-right min-w-[75px] bg-[#17202b] text-emerald-400 border-l border-slate-700 font-bold">
-                            TOTAL IN
+                          <th
+                            onClick={() => {
+                              if (monthlySortField === 'totalIn') {
+                                setMonthlySortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                              } else {
+                                setMonthlySortField('totalIn')
+                                setMonthlySortDir('desc')
+                              }
+                            }}
+                            className="sticky top-0 z-30 px-3 py-3 text-right min-w-[75px] bg-[#17202b] text-emerald-400 border-l border-slate-700 font-bold cursor-pointer select-none hover:bg-slate-800 transition"
+                            title="Klik untuk sortir berdasarkan Total IN"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>TOTAL IN</span>
+                              {monthlySortField === 'totalIn' ? (
+                                <span className="text-amber-400 font-extrabold">{monthlySortDir === 'asc' ? '▲' : '▼'}</span>
+                              ) : (
+                                <ArrowUpDown size={11} className="text-slate-500 opacity-60" />
+                              )}
+                            </div>
                           </th>
-                          <th className="px-3 py-3 text-right min-w-[75px] bg-[#17202b] text-rose-400 border-l border-slate-700 font-bold">
-                            TOTAL OUT
+                          <th
+                            onClick={() => {
+                              if (monthlySortField === 'totalOut') {
+                                setMonthlySortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                              } else {
+                                setMonthlySortField('totalOut')
+                                setMonthlySortDir('desc')
+                              }
+                            }}
+                            className="sticky top-0 z-30 px-3 py-3 text-right min-w-[75px] bg-[#17202b] text-rose-400 border-l border-slate-700 font-bold cursor-pointer select-none hover:bg-slate-800 transition"
+                            title="Klik untuk sortir berdasarkan Total OUT"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>TOTAL OUT</span>
+                              {monthlySortField === 'totalOut' ? (
+                                <span className="text-amber-400 font-extrabold">{monthlySortDir === 'asc' ? '▲' : '▼'}</span>
+                              ) : (
+                                <ArrowUpDown size={11} className="text-slate-500 opacity-60" />
+                              )}
+                            </div>
                           </th>
-                          <th className="px-3 py-3 text-right min-w-[85px] bg-[#17202b] text-blue-300 border-l border-slate-700 font-bold">
-                            SISA AKHIR
+                          <th
+                            onClick={() => {
+                              if (monthlySortField === 'finalSisa') {
+                                setMonthlySortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                              } else {
+                                setMonthlySortField('finalSisa')
+                                setMonthlySortDir('asc')
+                              }
+                            }}
+                            className="sticky top-0 z-30 px-3 py-3 text-right min-w-[85px] bg-[#17202b] text-blue-300 border-l border-slate-700 font-bold cursor-pointer select-none hover:bg-slate-800 transition"
+                            title="Klik untuk sortir berdasarkan Sisa Akhir"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>SISA AKHIR</span>
+                              {monthlySortField === 'finalSisa' ? (
+                                <span className="text-amber-400 font-extrabold">{monthlySortDir === 'asc' ? '▲' : '▼'}</span>
+                              ) : (
+                                <ArrowUpDown size={11} className="text-slate-500 opacity-60" />
+                              )}
+                            </div>
                           </th>
                         </tr>
                       </thead>
