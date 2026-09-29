@@ -837,7 +837,7 @@ export default function Page() {
                   onClick={handleOpenPartForm}
                   className="flex items-center justify-center gap-2 rounded-lg bg-[#202932] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#2c3945]"
                 >
-                  <Plus size={16} /> + Tambah Part Baru
+                  <Plus size={16} /> Tambah Part Baru
                 </button>
               </div>
 
@@ -1359,8 +1359,8 @@ export default function Page() {
 
       {/* MODAL INPUT PERGERAKAN (IN / OUT) */}
       {showMovementForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17202b]/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-[#17202b]/60 backdrop-blur-xs p-3 sm:p-4 pt-10 sm:pt-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col" style={{ maxHeight: 'calc(100dvh - 80px)' }}>
             <div className="flex items-start justify-between border-b border-slate-100 p-6">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-[#a17e00]">Form Mutasi Stok</p>
@@ -1375,7 +1375,7 @@ export default function Page() {
               </button>
             </div>
 
-            <div className="space-y-4 p-6">
+            <div className="space-y-4 p-5 overflow-y-auto flex-1">
               <div>
                 <label className="block mb-1.5 text-xs font-bold text-slate-600">Pilih Master Part *</label>
                 {parts.length === 0 ? (
@@ -1407,324 +1407,299 @@ export default function Page() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {/* Tanggal & Waktu Transaksi (Sistem Standar PKIS-PLUS) */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                      <Calendar size={13} className="text-indigo-500" /> Tanggal & Waktu
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setMovDate(getLocalDateString())}
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer active:scale-95 transition ${
-                          movDate === getLocalDateString()
-                            ? 'text-blue-600 bg-blue-500/15 border border-blue-400/30'
-                            : 'text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200'
-                        }`}
-                      >
-                        Hari Ini
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const target = new Date()
-                          target.setDate(target.getDate() - 1)
-                          setMovDate(getLocalDateString(target))
-                        }}
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer active:scale-95 transition ${
-                          (() => {
-                            const d = new Date()
-                            d.setDate(d.getDate() - 1)
-                            return movDate === getLocalDateString(d)
-                          })()
-                            ? 'text-blue-600 bg-blue-500/15 border border-blue-400/30'
-                            : 'text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200'
-                        }`}
-                      >
-                        Kemarin
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const now = new Date()
-                          setMovDate(getLocalDateString(now))
-                          setMovTime(getLocalTimeString(now))
-                        }}
-                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 px-2 py-0.5 rounded cursor-pointer active:scale-95 transition flex items-center gap-0.5"
-                      >
-                        ⚡ Sekarang
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={movDate}
-                      onChange={(e) => setMovDate(e.target.value)}
-                      className="w-full h-9 rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono font-semibold bg-white outline-none focus:border-[#eab308]"
-                    />
-                    <input
-                      type="time"
-                      value={movTime}
-                      onChange={(e) => setMovTime(e.target.value)}
-                      className="w-28 h-9 rounded-lg border border-slate-200 px-2 py-2 text-xs font-mono font-semibold bg-white outline-none focus:border-[#eab308]"
-                    />
-                  </div>
-
-                  {/* Stepper Cepat Hari & Live Timestamp Display */}
-                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const base = movDate ? new Date(movDate) : new Date()
-                          base.setDate(base.getDate() - 1)
-                          setMovDate(getLocalDateString(base))
-                        }}
-                        title="Mundur 1 Hari"
-                        className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold active:scale-95 transition"
-                      >
-                        ◀ -1 Hari
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const base = movDate ? new Date(movDate) : new Date()
-                          base.setDate(base.getDate() + 1)
-                          setMovDate(getLocalDateString(base))
-                        }}
-                        title="Maju 1 Hari"
-                        className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold active:scale-95 transition"
-                      >
-                        +1 Hari ▶
-                      </button>
-                    </div>
-                    <span className="font-mono text-slate-500 text-[10px] font-medium">
-                      {fmt(movDate ? `${movDate}T${movTime || '00:00'}` : null)}
-                    </span>
+              {/* ── Tanggal & Waktu (full-width, no nesting crunch) ── */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                    <Calendar size={13} className="text-indigo-500" />
+                    Tanggal &amp; Waktu Transaksi
+                  </label>
+                  {/* Quick-date shortcuts */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setMovDate(getLocalDateString())}
+                      className={`text-[10px] font-bold px-2 py-1 rounded-lg cursor-pointer active:scale-95 transition ${
+                        movDate === getLocalDateString()
+                          ? 'text-blue-700 bg-blue-100 border border-blue-300'
+                          : 'text-slate-500 bg-slate-100 hover:bg-slate-200'
+                      }`}
+                    >
+                      Hari Ini
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = new Date()
+                        target.setDate(target.getDate() - 1)
+                        setMovDate(getLocalDateString(target))
+                      }}
+                      className={`text-[10px] font-bold px-2 py-1 rounded-lg cursor-pointer active:scale-95 transition ${
+                        (() => {
+                          const d = new Date()
+                          d.setDate(d.getDate() - 1)
+                          return movDate === getLocalDateString(d)
+                        })()
+                          ? 'text-blue-700 bg-blue-100 border border-blue-300'
+                          : 'text-slate-500 bg-slate-100 hover:bg-slate-200'
+                      }`}
+                    >
+                      Kemarin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date()
+                        setMovDate(getLocalDateString(now))
+                        setMovTime(getLocalTimeString(now))
+                      }}
+                      className="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg cursor-pointer active:scale-95 transition flex items-center gap-0.5 border border-emerald-200"
+                    >
+                      ⚡ Sekarang
+                    </button>
                   </div>
                 </div>
 
-                {/* Jumlah (Qty) dengan Touch Stepper & Quick Chips */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-slate-600">Jumlah (Qty)</label>
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      {formatNumber(Number(movQty) || 0)} pcs
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
+                {/* Date + Time inputs side-by-side */}
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={movDate}
+                    onChange={(e) => setMovDate(e.target.value)}
+                    className="flex-1 h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-mono font-semibold outline-none focus:border-[#eab308]"
+                  />
+                  <input
+                    type="time"
+                    value={movTime}
+                    onChange={(e) => setMovTime(e.target.value)}
+                    className="w-[110px] h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm font-mono font-semibold outline-none focus:border-[#eab308]"
+                  />
+                </div>
+
+                {/* Day stepper + live preview */}
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setMovQty((prev) => String(Math.max(1, (Number(prev) || 0) - 10)))}
-                      className="h-10 w-11 shrink-0 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 active:scale-95 transition flex items-center justify-center text-xs"
+                      onClick={() => {
+                        const base = movDate ? new Date(movDate) : new Date()
+                        base.setDate(base.getDate() - 1)
+                        setMovDate(getLocalDateString(base))
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-[11px] active:scale-95 transition"
                     >
-                      -10
+                      ◀ -1 Hari
                     </button>
-                    <input
-                      type="number"
-                      min="1"
-                      value={movQty}
-                      onChange={(e) => setMovQty(e.target.value)}
-                      className="w-full text-center font-bold text-sm rounded-lg border border-slate-200 px-2 py-2 outline-none focus:border-[#eab308]"
-                      placeholder="100"
-                    />
                     <button
                       type="button"
-                      onClick={() => setMovQty((prev) => String((Number(prev) || 0) + 10))}
-                      className="h-10 w-11 shrink-0 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 active:scale-95 transition flex items-center justify-center text-xs"
+                      onClick={() => {
+                        const base = movDate ? new Date(movDate) : new Date()
+                        base.setDate(base.getDate() + 1)
+                        setMovDate(getLocalDateString(base))
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-[11px] active:scale-95 transition"
                     >
-                      +10
+                      +1 Hari ▶
                     </button>
                   </div>
-                  {/* Quick Qty Preset Chips */}
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {[50, 100, 250, 500].map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setMovQty(String(preset))}
-                        className={`px-2 py-1 rounded-md text-[11px] font-bold transition active:scale-95 ${
-                          Number(movQty) === preset
-                            ? 'bg-[#f4c430] text-[#202932] shadow-xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {preset}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setMovQty((prev) => String((Number(prev) || 0) + 100))}
-                      className="px-2 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 active:scale-95 transition"
-                    >
-                      +100
-                    </button>
-                  </div>
+                  <span className="font-mono text-[11px] text-slate-500 font-semibold">
+                    {fmt(movDate ? `${movDate}T${movTime || '00:00'}` : null)}
+                  </span>
                 </div>
               </div>
 
+              {/* ── Jumlah (Qty) ── */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-600">Jumlah (Qty)</label>
+                  <span className="text-[11px] font-mono font-semibold text-slate-500">
+                    {formatNumber(Number(movQty) || 0)} pcs
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMovQty((prev) => String(Math.max(1, (Number(prev) || 0) - 10)))}
+                    className="h-10 w-12 shrink-0 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 active:scale-95 transition text-sm"
+                  >
+                    −10
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    value={movQty}
+                    onChange={(e) => setMovQty(e.target.value)}
+                    className="flex-1 text-center font-bold text-base h-10 rounded-lg border border-slate-200 bg-white px-2 outline-none focus:border-[#eab308]"
+                    placeholder="100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMovQty((prev) => String((Number(prev) || 0) + 10))}
+                    className="h-10 w-12 shrink-0 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 active:scale-95 transition text-sm"
+                  >
+                    +10
+                  </button>
+                </div>
+                {/* Quick preset chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {[50, 100, 250, 500].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setMovQty(String(preset))}
+                      className={`h-8 px-3 rounded-lg text-xs font-bold transition active:scale-95 ${
+                        Number(movQty) === preset
+                          ? 'bg-[#f4c430] text-[#202932] shadow-sm'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setMovQty((prev) => String((Number(prev) || 0) + 100))}
+                    className="h-8 px-3 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 active:scale-95 transition"
+                  >
+                    +100
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Tipe Pergerakan ── */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-slate-600">Tipe Pergerakan</span>
                   {currentRole !== 'SUPERVISOR' && (
-                    <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 flex items-center gap-1">
-                      <Lock size={10} /> Terkunci untuk {ROLES[currentRole].name}
+                    <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5 flex items-center gap-1">
+                      <Lock size={10} /> Terkunci: {ROLES[currentRole].name}
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     disabled={!ROLES[currentRole].allowedTypes.includes('IN')}
                     onClick={() => setMovType('IN')}
-                    className={`rounded-lg border px-4 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition ${
+                    className={`rounded-xl border-2 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 transition ${
                       movType === 'IN'
                         ? 'border-[#29934b] bg-[#eaf6ed] text-[#29934b] shadow-sm'
                         : !ROLES[currentRole].allowedTypes.includes('IN')
-                        ? 'border-slate-100 bg-slate-100/70 text-slate-300 cursor-not-allowed opacity-60'
-                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    <ArrowDownToLine size={16} /> MASUK (IN)
+                    <ArrowDownToLine size={16} />
+                    <span>MASUK (IN)</span>
                   </button>
                   <button
                     type="button"
                     disabled={!ROLES[currentRole].allowedTypes.includes('OUT')}
                     onClick={() => setMovType('OUT')}
-                    className={`rounded-lg border px-4 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition ${
+                    className={`rounded-xl border-2 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 transition ${
                       movType === 'OUT'
                         ? 'border-[#c75a42] bg-[#fff0eb] text-[#c75a42] shadow-sm'
                         : !ROLES[currentRole].allowedTypes.includes('OUT')
-                        ? 'border-slate-100 bg-slate-100/70 text-slate-300 cursor-not-allowed opacity-60'
-                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    <ArrowUpFromLine size={16} /> KELUAR (OUT)
+                    <ArrowUpFromLine size={16} />
+                    <span>KELUAR (OUT)</span>
                   </button>
                 </div>
-                {/* Role guidance notice */}
                 {currentRole === 'RECEIVING' && (
-                  <p className="mt-1.5 text-[11px] text-emerald-700 bg-emerald-50/70 rounded-md px-2.5 py-1 border border-emerald-100 flex items-center gap-1.5">
-                    🟢 Role <strong>Operator Receiving</strong> hanya berwenang mencatat pergerakan barang masuk (IN).
+                  <p className="mt-2 text-[11px] text-emerald-700 bg-emerald-50 rounded-lg px-3 py-1.5 border border-emerald-100 flex items-center gap-1.5">
+                    🟢 <strong>Operator Receiving</strong>: hanya input barang masuk (IN).
                   </p>
                 )}
                 {currentRole === 'PRODUCTION' && (
-                  <p className="mt-1.5 text-[11px] text-rose-700 bg-rose-50/70 rounded-md px-2.5 py-1 border border-rose-100 flex items-center gap-1.5">
-                    🔴 Role <strong>Operator Produksi</strong> hanya berwenang mencatat pemakaian/pengeluaran barang (OUT).
+                  <p className="mt-2 text-[11px] text-rose-700 bg-rose-50 rounded-lg px-3 py-1.5 border border-rose-100 flex items-center gap-1.5">
+                    🔴 <strong>Operator Produksi</strong>: hanya input pengeluaran barang (OUT).
                   </p>
                 )}
               </div>
 
-              {/* Keterangan / Catatan dengan Preset Chips untuk Tablet */}
+              {/* ── Keterangan / Catatan ── */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-bold text-slate-600">Keterangan / Catatan</label>
-                  <span className="text-[10px] text-slate-400">Tap pilihan di bawah atau ketik manual</span>
+                  <span className="text-[10px] text-slate-400">Tap preset atau ketik manual</span>
                 </div>
                 <input
                   type="text"
                   value={movNote}
                   onChange={(e) => setMovNote(e.target.value)}
-                  placeholder="Pilih tombol di bawah atau ketik..."
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#eab308]"
+                  placeholder="Pilih preset di bawah atau ketik..."
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#eab308] mb-2"
                 />
-                {/* Quick Note Chips */}
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {movType === 'IN' ? (
-                    <>
-                      {[
-                        'Input dari Supplier',
-                        'Bongkar Kontainer',
-                        'Retur Produksi',
-                        'Koreksi Stok Fisik',
-                        'Kedatangan Material Baru',
-                      ].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setMovNote(preset)}
-                          className={`text-[11px] px-2.5 py-1 rounded-lg border transition active:scale-95 ${
-                            movNote === preset
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold shadow-xs'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {preset}
-                        </button>
-                      ))}
-                    </>
-                  ) : (
-                    <>
-                      {[
-                        'Pemakaian Line YHA',
-                        'Pemakaian Line YHB',
-                        'Supply Setting Dies',
-                        'Scrap / Part Defect',
-                        'Trial Line Produksi',
-                        'Sample Quality Control',
-                      ].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setMovNote(preset)}
-                          className={`text-[11px] px-2.5 py-1 rounded-lg border transition active:scale-95 ${
-                            movNote === preset
-                              ? 'bg-rose-50 text-rose-800 border-rose-300 font-bold shadow-xs'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {preset}
-                        </button>
-                      ))}
-                    </>
-                  )}
+                <div className="flex flex-wrap gap-1.5">
+                  {(movType === 'IN'
+                    ? ['Input dari Supplier', 'Bongkar Kontainer', 'Retur Produksi', 'Koreksi Stok Fisik', 'Material Baru']
+                    : ['Pemakaian Line YHA', 'Pemakaian Line YHB', 'Supply Setting Dies', 'Scrap / Part Defect', 'Trial Produksi', 'Sample QC']
+                  ).map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setMovNote(preset)}
+                      className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border transition active:scale-95 ${
+                        movNote === preset
+                          ? movType === 'IN'
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-rose-100 text-rose-800 border-rose-300'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
                   {movNote && (
                     <button
                       type="button"
                       onClick={() => setMovNote('')}
-                      className="text-[11px] px-2 py-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                      className="h-7 px-2.5 rounded-lg text-[11px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-100 transition"
                     >
-                      ✕ Clear
+                      ✕ Hapus
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Live Preview Balance */}
+              {/* ── Live Stock Preview ── */}
               {selectedPartId && parts.length > 0 && (
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-4 text-sm border border-slate-100">
-                  <div>
-                    <p className="text-xs text-slate-400">Stok Saat Ini</p>
-                    <p className="mt-0.5 font-bold text-slate-700">
-                      {formatNumber(partStats[selectedPartId]?.currentStock ?? 0)} units
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-400">Estimasi Saldo Baru</p>
-                    {(() => {
-                      const cur = partStats[selectedPartId]?.currentStock ?? 0
-                      const change = (movType === 'IN' ? 1 : -1) * (Number(movQty) || 0)
-                      const next = cur + change
-                      return (
-                        <p className={`mt-0.5 font-bold ${next < 0 ? 'text-[#c75a42]' : 'text-[#29934b]'}`}>
-                          {formatNumber(next)} units {next < 0 && '(Minus)'}
-                        </p>
-                      )
-                    })()}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+                  <div className="grid grid-cols-2 divide-x divide-slate-200">
+                    <div className="px-4 py-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Stok Saat Ini</p>
+                      <p className="mt-0.5 text-lg font-bold text-slate-700">
+                        {formatNumber(partStats[selectedPartId]?.currentStock ?? 0)}
+                        <span className="text-xs font-normal text-slate-400 ml-1">pcs</span>
+                      </p>
+                    </div>
+                    <div className="px-4 py-3 text-right">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Estimasi Saldo Baru</p>
+                      {(() => {
+                        const cur = partStats[selectedPartId]?.currentStock ?? 0
+                        const change = (movType === 'IN' ? 1 : -1) * (Number(movQty) || 0)
+                        const next = cur + change
+                        return (
+                          <p className={`mt-0.5 text-lg font-bold ${next < 0 ? 'text-[#c75a42]' : 'text-[#29934b]'}`}>
+                            {formatNumber(next)}
+                            <span className="text-xs font-normal ml-1">{next < 0 ? '⚠ Minus' : 'pcs'}</span>
+                          </p>
+                        )
+                      })()}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-slate-100 p-6 bg-slate-50/50">
+            <div className="flex justify-end gap-2.5 border-t border-slate-100 px-5 py-4 bg-slate-50/60 shrink-0">
               <button
                 type="button"
                 onClick={handleCloseMovementForm}
-                className="rounded-lg px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100"
+                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-100 transition"
               >
                 Batal
               </button>
@@ -1732,9 +1707,9 @@ export default function Page() {
                 type="button"
                 disabled={parts.length === 0}
                 onClick={handleAddMovement}
-                className="rounded-lg bg-[#202932] px-5 py-2 text-xs font-bold text-white hover:bg-[#2c3945] disabled:opacity-50 shadow-sm"
+                className="rounded-xl bg-[#202932] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#2c3945] disabled:opacity-50 shadow-sm transition active:scale-95"
               >
-                Simpan Transaksi
+                💾 Simpan Transaksi
               </button>
             </div>
           </div>
