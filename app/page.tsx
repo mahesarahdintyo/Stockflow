@@ -25,6 +25,7 @@ import {
   Lock,
   Maximize2,
   Minimize2,
+  Moon,
   MoreHorizontal,
   PackageCheck,
   Plus,
@@ -33,6 +34,7 @@ import {
   Settings,
   ShieldCheck,
   SlidersHorizontal,
+  Sun,
   Trash2,
   Tv,
   User,
@@ -212,6 +214,49 @@ export default function Page() {
   const [stockMovementView, setStockMovementView] = useState<'matrix' | 'list'>('matrix')
   const [monthlySortField, setMonthlySortField] = useState<MonthlySortField>('id')
   const [monthlySortDir, setMonthlySortDir] = useState<'asc' | 'desc'>('asc')
+
+  // Theme state: 'light' | 'dark' | 'system' — pola PKIS-PLUS
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+
+  function applyThemeToDOM(t: 'light' | 'dark' | 'system') {
+    const html = document.documentElement
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const effectiveDark = t === 'dark' || (t === 'system' && prefersDark)
+    if (effectiveDark) {
+      html.classList.add('dark')
+      html.classList.remove('light')
+    } else {
+      html.classList.add('light')
+      html.classList.remove('dark')
+    }
+  }
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('stockflow.theme') as 'light' | 'dark' | 'system' | null
+      const initial = (saved === 'dark' || saved === 'light' || saved === 'system') ? saved : 'system'
+      setTheme(initial)
+      applyThemeToDOM(initial)
+    } catch {
+      applyThemeToDOM('system')
+    }
+  }, [])
+
+  function toggleTheme() {
+    setTheme((prev) => {
+      // cycle: system → light → dark → system
+      const next: 'light' | 'dark' | 'system' =
+        prev === 'system' ? 'light' : prev === 'light' ? 'dark' : 'system'
+      try {
+        applyThemeToDOM(next)
+        localStorage.setItem('stockflow.theme', next)
+      } catch { /* ignore */ }
+      return next
+    })
+  }
+
+  // Derived: effective dark flag — dipakai untuk conditional inline styling
+  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   // Fullscreen TV 52" mode
   const [isTvFullscreen, setIsTvFullscreen] = useState(false)
@@ -922,11 +967,17 @@ export default function Page() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#17202b]">
+    <div className="min-h-screen transition-colors" style={{ backgroundColor: 'var(--sf-page-bg)', color: 'var(--foreground)' }}>
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col bg-[#202932] text-white lg:flex">
+      <aside
+        className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col text-white lg:flex border-r border-white/10"
+        style={{ backgroundColor: 'var(--sf-sidebar-bg)' }}
+      >
         <div className="flex h-[82px] items-center gap-3 border-b border-white/10 px-7">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f4c430] text-[#202932]">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-xl font-bold"
+                      style={{ backgroundColor: 'var(--sf-brand)', color: 'var(--sf-brand-text)' }}
+          >
             <Warehouse size={22} strokeWidth={2.5} />
           </div>
           <div>
@@ -944,9 +995,16 @@ export default function Page() {
                 onClick={() => setActivePage(label)}
                 className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition ${
                   activePage === label
-                    ? 'bg-[#f4c430] text-[#17202b] shadow-lg shadow-yellow-900/10 font-bold'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                    ? 'font-bold shadow-lg'
+                    : 'text-slate-300 hover:text-white'
                 }`}
+                style={
+                  activePage === label
+                    ? { backgroundColor: 'var(--sf-brand)', color: 'var(--sf-brand-text)', borderLeft: '3px solid var(--sf-sidebar-active-border)' }
+                    : { color: 'rgba(200,220,230,0.85)' }
+                }
+                onMouseEnter={(e) => { if (activePage !== label) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--sf-sidebar-hover)' }}
+                onMouseLeave={(e) => { if (activePage !== label) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '' }}
               >
                 <Icon size={18} />
                 {label}
@@ -964,7 +1022,10 @@ export default function Page() {
             <RotateCcw size={16} /> Reset Semua Data
           </button>
           <div className="mt-3 flex items-center gap-3 rounded-lg bg-white/5 p-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f4c430] text-xs font-bold text-[#202932]">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold"
+              style={{ backgroundColor: 'var(--sf-brand)', color: 'var(--sf-brand-text)' }}
+            >
               OP
             </div>
             <div className="min-w-0">
@@ -978,15 +1039,43 @@ export default function Page() {
       {/* Main Content */}
       <main className="lg:pl-[248px]">
         {/* Top Navbar */}
-        <header className="flex h-[82px] items-center justify-between border-b border-[#e0e4e8] bg-white px-5 sm:px-9">
+        <header
+          className="flex h-[82px] items-center justify-between px-5 sm:px-9 transition-colors"
+          style={{ backgroundColor: 'var(--sf-header-bg)', borderBottom: '1px solid var(--sf-header-border)' }}
+        >
           <div>
             <p className="text-xs font-medium text-slate-400">Production Inventory / {activePage}</p>
-            <h1 className="mt-1 text-xl font-bold tracking-tight">{activePage}</h1>
+            <h1 className="mt-1 text-xl font-bold tracking-tight" style={{ color: 'var(--foreground)' }}>{activePage}</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* Theme Toggle — cycle: system → light → dark (PKIS-PLUS pattern) */}
+            <button
+              type="button"
+              id="theme-toggle-btn"
+              onClick={toggleTheme}
+              title={
+                theme === 'system' ? 'Mode Sistem — klik untuk Mode Terang'
+                : theme === 'light' ? 'Mode Terang — klik untuk Mode Gelap'
+                : 'Mode Gelap — klik untuk Mode Sistem'
+              }
+              className="flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold shadow-xs transition active:scale-95"
+              style={isDark
+                ? { background: 'var(--sf-card-bg)', borderColor: 'var(--border)', color: 'var(--sf-brand)' }
+                : { background: 'var(--sf-brand-dim)', borderColor: '#99f6e4', color: 'var(--sf-brand)' }
+              }
+            >
+              {theme === 'dark' ? (
+                <><Moon size={15} /><span className="hidden sm:inline">Gelap</span></>
+              ) : theme === 'light' ? (
+                <><Sun size={15} /><span className="hidden sm:inline">Terang</span></>
+              ) : (
+                <><Sun size={15} className="opacity-60" /><span className="hidden sm:inline">Sistem</span></>
+              )}
+            </button>
+
             {/* Role Switcher Simulator */}
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-xs">
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white dark:bg-slate-800/90 dark:border-slate-700 px-3 py-1.5 shadow-xs">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
                 <ShieldCheck size={14} className="text-[#a17e00]" />
                 <span className="hidden sm:inline">Role:</span>
               </div>
@@ -999,7 +1088,7 @@ export default function Page() {
                   if (newRole === 'RECEIVING') setMovType('IN')
                   else if (newRole === 'PRODUCTION') setMovType('OUT')
                 }}
-                className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer pr-1"
+                className="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-100 outline-none cursor-pointer pr-1"
               >
                 <option value="SUPERVISOR">👑 Warehouse Admin (Full)</option>
                 <option value="RECEIVING">📥 Operator Receiving (IN)</option>
@@ -1012,7 +1101,7 @@ export default function Page() {
               </span>
             </div>
 
-            <span className="hidden md:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+            <span className="hidden md:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Penyimpanan Browser
             </span>
@@ -1042,7 +1131,10 @@ export default function Page() {
                   </button>
                   <button
                     onClick={handleOpenMovementForm}
-                    className="flex items-center gap-2 rounded-lg bg-[#202932] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#2c3945] transition"
+                    className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold text-white shadow-sm transition"
+                    style={{ backgroundColor: 'var(--sf-sidebar-bg)' }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = theme === 'dark' ? '#2c3945' : '#0f766e')}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--sf-sidebar-bg)')}
                   >
                     <Plus size={16} /> Input Pergerakan
                   </button>
@@ -1083,15 +1175,20 @@ export default function Page() {
 
               {/* Main Grid: Movements & Line breakdown */}
               <div className="mt-7 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-                <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                  <div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center">
+                <section className="rounded-xl border shadow-sm"
+                  style={{ borderColor: 'var(--sf-header-border)', backgroundColor: 'var(--sf-card-bg)' }}
+                >
+                  <div className="flex flex-col justify-between gap-3 border-b p-5 sm:flex-row sm:items-center"
+                    style={{ borderColor: 'var(--sf-header-border)' }}
+                  >
                     <div>
                       <h3 className="font-bold">Transaksi Terkini</h3>
                       <p className="mt-1 text-xs text-slate-400">Riwayat transaksi masuk & keluar terbaru</p>
                     </div>
                     <button
                       onClick={() => setActivePage('Stock Movement')}
-                      className="text-xs font-bold text-[#a17e00] hover:underline"
+                      className="text-xs font-bold hover:underline"
+                      style={{ color: 'var(--sf-brand)' }}
                     >
                       Lihat Semua Transaksi →
                     </button>
@@ -1105,9 +1202,11 @@ export default function Page() {
                   />
                 </section>
 
-                <section className="rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col justify-between">
+                <section className="rounded-xl border shadow-sm flex flex-col justify-between"
+                  style={{ borderColor: 'var(--sf-header-border)', backgroundColor: 'var(--sf-card-bg)' }}
+                >
                   <div>
-                    <div className="border-b border-slate-100 p-5">
+                    <div className="border-b p-5" style={{ borderColor: 'var(--sf-header-border)' }}>
                       <h3 className="font-bold">Distribusi Stok per Line</h3>
                       <p className="mt-1 text-xs text-slate-400">Keseimbangan stok pada setiap jalur produksi</p>
                     </div>
@@ -1129,9 +1228,15 @@ export default function Page() {
                       )}
                     </div>
                   </div>
-                  <div className="m-5 rounded-lg bg-amber-50/70 border border-amber-200/60 p-3.5 text-xs text-amber-900">
+                  <div
+                    className="m-5 rounded-lg p-3.5 text-xs border"
+                    style={theme === 'dark'
+                      ? { background: 'rgba(244,196,48,0.06)', borderColor: 'rgba(244,196,48,0.18)', color: '#d4a017' }
+                      : { background: '#f0fdfa', borderColor: '#99f6e4', color: '#0f766e' }
+                    }
+                  >
                     <p className="font-bold mb-0.5">ℹ️ Mode Mandiri (Tanpa Akun)</p>
-                    <p className="text-amber-800 text-[11px] leading-relaxed">
+                    <p className="text-[11px] leading-relaxed opacity-80">
                       Semua data yang Anda input otomatis tersimpan di penyimpanan lokal browser Anda. Anda bebas menguji coba input transaksi tanpa perlu registrasi atau membuat akun Supabase.
                     </p>
                   </div>
@@ -1139,8 +1244,12 @@ export default function Page() {
               </div>
 
               {/* Part Table Section */}
-              <section className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center">
+              <section className="mt-6 rounded-xl border shadow-sm"
+                style={{ borderColor: 'var(--sf-header-border)', backgroundColor: 'var(--sf-card-bg)' }}
+              >
+                <div className="flex flex-col justify-between gap-3 border-b p-5 sm:flex-row sm:items-center"
+                  style={{ borderColor: 'var(--sf-header-border)' }}
+                >
                   <div>
                     <h3 className="font-bold">Status Stok Master Part</h3>
                     <p className="mt-1 text-xs text-slate-400">Pantau jumlah stok real-time per barang</p>
@@ -1152,12 +1261,18 @@ export default function Page() {
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Cari kode/part..."
-                        className="w-48 rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-[#eab308]"
+                        className="w-48 rounded-lg border py-2 pl-9 pr-3 text-xs outline-none transition"
+                        style={{ borderColor: 'var(--sf-header-border)', background: 'var(--sf-card-bg)', color: 'var(--foreground)' }}
+                        onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--sf-brand)')}
+                        onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--sf-header-border)')}
                       />
                     </div>
                     <button
                       onClick={handleOpenPartForm}
-                      className="flex items-center gap-1.5 rounded-lg bg-[#202932] px-3 py-2 text-xs font-bold text-white hover:bg-[#2c3945]"
+                      className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white transition"
+                      style={{ backgroundColor: 'var(--sf-sidebar-bg)' }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = theme === 'dark' ? '#2c3945' : '#0f766e')}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--sf-sidebar-bg)')}
                     >
                       <Plus size={14} /> Tambah Part
                     </button>
@@ -1183,22 +1298,31 @@ export default function Page() {
               ref={tvContainerRef}
               className={
                 isTvFullscreen
-                  ? 'fixed inset-0 z-50 bg-[#0b1320] text-slate-100 flex flex-col h-screen overflow-hidden p-2 sm:p-3'
+                  ? `fixed inset-0 z-50 flex flex-col h-screen overflow-hidden p-2 sm:p-3 transition-colors duration-200 ${
+                      theme === 'dark' ? 'text-slate-100' : 'text-slate-900'
+                    }`
                   : 'relative tab-fade-in'
               }
+              style={isTvFullscreen ? { backgroundColor: 'var(--sf-page-bg)' } : undefined}
             >
               {/* Specialized Fullscreen TV 52" Compact Top Bar (when in TV Mode) */}
               {isTvFullscreen ? (
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2.5 bg-slate-900/95 border border-slate-700/80 px-3.5 py-1.5 rounded-xl shadow-xl shrink-0">
+                <div
+                  className={`mb-2 flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-1.5 rounded-xl shadow-xl shrink-0 border transition-colors ${
+                    theme === 'dark'
+                      ? 'bg-slate-900/95 border-slate-700/80 text-white'
+                      : 'bg-white border-slate-300 text-slate-800 shadow-md'
+                  }`}
+                >
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/20 text-amber-400 border border-amber-400/30">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/20 text-amber-500 dark:text-amber-400 border border-amber-400/30">
                       <Tv size={17} strokeWidth={2.5} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <h1 className="text-xs sm:text-sm font-black tracking-wider uppercase text-white">
+                      <h1 className="text-xs sm:text-sm font-black tracking-wider uppercase">
                         ANDON TV 52&quot; &bull; STOCK BULANAN
                       </h1>
-                      <span className="rounded-full bg-emerald-500/20 border border-emerald-400/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                      <span className="rounded-full bg-emerald-500/20 border border-emerald-400/30 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                         {monthMeta.labelIndo} ({monthlyMatrixData.length} Part)
                       </span>
                     </div>
@@ -1206,13 +1330,23 @@ export default function Page() {
 
                   {/* Sorting & Filter controls directly on TV Top Bar */}
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 bg-slate-950/90 border border-slate-700 px-2 py-1 rounded-lg">
-                      <ArrowUpDown size={13} className="text-amber-400" />
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">Sortir:</span>
+                    <div
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border ${
+                        theme === 'dark' ? 'bg-slate-950/90 border-slate-700' : 'bg-slate-50 border-slate-300'
+                      }`}
+                    >
+                      <ArrowUpDown size={13} className="text-amber-500" />
+                      <span className={`text-[11px] font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                        Sortir:
+                      </span>
                       <select
                         value={monthlySortField}
                         onChange={(e) => setMonthlySortField(e.target.value as MonthlySortField)}
-                        className="h-7 rounded bg-slate-900 border border-slate-700 px-2 text-xs font-semibold text-white outline-none focus:border-amber-400 cursor-pointer"
+                        className={`h-7 rounded px-2 text-xs font-semibold outline-none cursor-pointer border ${
+                          theme === 'dark'
+                            ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
+                            : 'bg-white border-slate-300 text-slate-800 focus:border-teal-500'
+                        }`}
                       >
                         <option value="id">Kode Part</option>
                         <option value="part">Nama Part</option>
@@ -1227,19 +1361,33 @@ export default function Page() {
                         type="button"
                         onClick={() => setMonthlySortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
                         title={monthlySortDir === 'asc' ? 'Urutan: Naik (A-Z / Terkecil)' : 'Urutan: Turun (Z-A / Terbesar)'}
-                        className="h-7 px-2 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-bold flex items-center gap-1 transition active:scale-95"
+                        className={`h-7 px-2 rounded border text-xs font-bold flex items-center gap-1 transition active:scale-95 ${
+                          theme === 'dark'
+                            ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                        }`}
                       >
                         {monthlySortDir === 'asc' ? '↑ Naik' : '↓ Turun'}
                       </button>
                     </div>
 
                     {/* Quick Line filter for TV */}
-                    <div className="hidden md:flex items-center gap-1.5 bg-slate-950/90 border border-slate-700 px-2 py-1 rounded-lg">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Line:</span>
+                    <div
+                      className={`hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg border ${
+                        theme === 'dark' ? 'bg-slate-950/90 border-slate-700' : 'bg-slate-50 border-slate-300'
+                      }`}
+                    >
+                      <span className={`text-[11px] font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Line:
+                      </span>
                       <select
                         value={monthlyLineFilter}
                         onChange={(e) => setMonthlyLineFilter(e.target.value)}
-                        className="h-7 rounded bg-slate-900 border border-slate-700 px-2 text-xs font-semibold text-white outline-none focus:border-amber-400 cursor-pointer"
+                        className={`h-7 rounded px-2 text-xs font-semibold outline-none cursor-pointer border ${
+                          theme === 'dark'
+                            ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
+                            : 'bg-white border-slate-300 text-slate-800 focus:border-teal-500'
+                        }`}
                       >
                         <option value="All lines">Semua Line</option>
                         {availableLines.map((l) => (
@@ -1253,13 +1401,32 @@ export default function Page() {
 
                   {/* Digital Clock & Actions */}
                   <div className="flex items-center gap-2">
-                    <div className="hidden lg:flex items-center gap-2 bg-slate-950/90 border border-slate-800 px-2.5 py-1 rounded-lg">
-                      <Clock size={13} className="text-amber-400 animate-pulse" />
-                      <span className="font-mono font-bold text-xs tracking-wider text-amber-300">
+                    <div
+                      className={`hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-lg border ${
+                        theme === 'dark' ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-50 border-slate-300'
+                      }`}
+                    >
+                      <Clock size={13} className="text-amber-500 animate-pulse" />
+                      <span className="font-mono font-bold text-xs tracking-wider text-amber-500 dark:text-amber-300">
                         {currentClock.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}{' '}
                         <span className="text-[10px] text-slate-400">WIB</span>
                       </span>
                     </div>
+
+                    {/* Theme Switcher Toggle in TV Mode */}
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      title={theme === 'dark' ? 'Ganti ke Mode Terang (Light Mode)' : 'Ganti ke Mode Gelap (Dark Mode)'}
+                      className={`h-8 px-2.5 rounded-lg border font-bold text-xs flex items-center gap-1.5 transition active:scale-95 ${
+                        theme === 'dark'
+                          ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                      }`}
+                    >
+                      {theme === 'dark' ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-teal-600" />}
+                      <span className="hidden sm:inline">{theme === 'dark' ? 'Terang' : 'Gelap'}</span>
+                    </button>
 
                     <button
                       type="button"
@@ -1281,20 +1448,33 @@ export default function Page() {
                   </div>
                 </div>
               ) : (
-                /* Standard Top Dark Header Bar */
-                <div className="mb-6 rounded-2xl bg-[#17202b] text-white p-4 sm:p-5 shadow-lg border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                /* Standard Top Header Bar */
+                <div
+                  className="mb-6 rounded-2xl p-4 sm:p-5 shadow-sm border flex flex-wrap items-center justify-between gap-4 transition-colors"
+                  style={{
+                    backgroundColor: 'var(--sf-card-bg)',
+                    borderColor: 'var(--sf-header-border)',
+                  }}
+                >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f4c430]/15 text-[#f4c430] border border-[#f4c430]/20 shadow-inner">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center rounded-xl shadow-inner transition-colors"
+                      style={{
+                        backgroundColor: 'var(--sf-brand-light)',
+                        color: 'var(--sf-brand)',
+                        border: '1px solid var(--sf-brand-light)',
+                      }}
+                    >
                       <ClipboardList size={22} strokeWidth={2.5} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-bold tracking-tight text-white">Stock Bulanan</h2>
-                        <span className="hidden sm:inline-block rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
+                        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Stock Bulanan</h2>
+                        <span className="hidden sm:inline-block rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                           Laporan Harian
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         Monitoring saldo awal, mutasi masuk/keluar, dan sisa stok harian selama 1 bulan penuh
                       </p>
                     </div>
@@ -1321,7 +1501,11 @@ export default function Page() {
                     <button
                       type="button"
                       onClick={handleOpenMovementForm}
-                      className="flex items-center justify-center gap-1.5 rounded-xl bg-[#f4c430] hover:bg-[#eab308] px-4 py-2 text-xs font-bold text-[#17202b] shadow-sm transition active:scale-95"
+                      className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold shadow-sm transition active:scale-95"
+                      style={{
+                        backgroundColor: 'var(--sf-brand)',
+                        color: theme === 'dark' ? '#17202b' : '#ffffff',
+                      }}
                     >
                       <Plus size={16} /> Input Mutasi
                     </button>
@@ -1391,7 +1575,7 @@ export default function Page() {
                               type="month"
                               value={selectedMonth}
                               onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-                              className="w-full h-10 rounded-xl border px-3 font-semibold text-xs outline-none border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]"
+                              className="w-full h-10 rounded-xl border px-3 font-semibold text-xs outline-none border-slate-200 bg-white text-slate-800 focus:border-teal-500 dark:focus:border-[#f4c430]"
                             />
                           </div>
                           <button
@@ -1421,7 +1605,7 @@ export default function Page() {
                         <select
                           value={monthlyItemFilter}
                           onChange={(e) => setMonthlyItemFilter(e.target.value)}
-                          className="w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]"
+                          className="w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none border-slate-200 bg-white text-slate-800 focus:border-teal-500 dark:focus:border-[#f4c430]"
                         >
                           <option value="ALL">SEMUA ITEM</option>
                           {parts.map((p) => (
@@ -1440,7 +1624,7 @@ export default function Page() {
                         <select
                           value={monthlyLineFilter}
                           onChange={(e) => setMonthlyLineFilter(e.target.value)}
-                          className="w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]"
+                          className="w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none border-slate-200 bg-white text-slate-800 focus:border-teal-500 dark:focus:border-[#f4c430]"
                         >
                           <option value="All lines">Semua Line</option>
                           {availableLines.map((l) => (
@@ -1473,7 +1657,7 @@ export default function Page() {
                             value={monthlySearch}
                             onChange={(e) => setMonthlySearch(e.target.value)}
                             placeholder="Cari part number, nama, spec..."
-                            className="w-full h-9 rounded-lg border border-slate-200 bg-white text-slate-800 focus:border-[#f4c430] pl-8 pr-3 text-xs outline-none"
+                            className="w-full h-9 rounded-lg border border-slate-200 bg-white text-slate-800 focus:border-teal-500 dark:focus:border-[#f4c430] pl-8 pr-3 text-xs outline-none"
                           />
                         </div>
 
@@ -1484,7 +1668,7 @@ export default function Page() {
                           <select
                             value={monthlySortField}
                             onChange={(e) => setMonthlySortField(e.target.value as MonthlySortField)}
-                            className="h-9 rounded-lg border border-slate-200 bg-white text-slate-800 px-2.5 text-xs font-semibold outline-none focus:border-[#f4c430]"
+                            className="h-9 rounded-lg border border-slate-200 bg-white text-slate-800 px-2.5 text-xs font-semibold outline-none focus:border-teal-500 dark:focus:border-[#f4c430]"
                           >
                             <option value="id">Kode Part</option>
                             <option value="part">Nama Part</option>
@@ -1563,7 +1747,15 @@ export default function Page() {
               {/* Main Content Area */}
               {stockMovementView === 'matrix' ? (
                 /* ── MONTHLY MATRIX TABLE (IN / OUT / SISA only, AWAL is in front) ── */
-                <div className={`rounded-2xl border shadow-md overflow-hidden flex flex-col ${isTvFullscreen ? 'border-slate-700 bg-slate-950 flex-1 min-h-0' : 'border-slate-300 bg-white'}`}>
+                <div
+                  className={`rounded-2xl border shadow-md overflow-hidden flex flex-col transition-colors ${
+                    isTvFullscreen
+                      ? theme === 'dark'
+                        ? 'border-slate-700 bg-slate-950 flex-1 min-h-0'
+                        : 'border-slate-300 bg-white flex-1 min-h-0'
+                      : 'border-slate-300 bg-white dark:border-slate-800 dark:bg-slate-900'
+                  }`}
+                >
                   <div className={`${isTvFullscreen ? 'flex-1 min-h-0 overflow-auto' : 'overflow-x-auto'}`}>
                     <table className="w-full text-left border-collapse text-xs">
                       {/* Dark table header */}
@@ -1606,7 +1798,9 @@ export default function Page() {
                                 key={dayNum}
                                 className={`sticky top-0 z-30 px-2 py-3 text-center min-w-[58px] border-r border-slate-700/60 transition ${
                                   isToday
-                                    ? 'bg-amber-950/80 text-[#f4c430] border-t-2 border-t-[#f4c430]'
+                                    ? theme === 'light'
+                                      ? 'bg-teal-900/60 text-teal-200 border-t-2 border-t-teal-400'
+                                      : 'bg-amber-950/80 text-[#f4c430] border-t-2 border-t-[#f4c430]'
                                     : isWeekend
                                     ? 'bg-slate-800 text-slate-400'
                                     : 'bg-[#17202b] text-slate-200'
@@ -1690,16 +1884,16 @@ export default function Page() {
                       </thead>
 
                       {/* Table Body */}
-                      <tbody className="divide-y divide-slate-200">
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                         {monthlyMatrixData.length === 0 ? (
                           <tr>
                             <td
                               colSpan={monthMeta.daysCount + 4}
                               className="px-6 py-14 text-center text-slate-400"
                             >
-                              <Boxes size={36} className="mx-auto mb-2 text-slate-300" />
-                              <p className="font-bold text-sm text-slate-600">Tidak ada item material yang sesuai.</p>
-                              <p className="text-xs text-slate-400 mt-1">
+                              <Boxes size={36} className="mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                              <p className="font-bold text-sm text-slate-600 dark:text-slate-300">Tidak ada item material yang sesuai.</p>
+                              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                                 Silakan sesuaikan filter atau tambahkan master part terlebih dahulu.
                               </p>
                               {parts.length === 0 && (
@@ -1721,43 +1915,43 @@ export default function Page() {
                             return (
                               <React.Fragment key={item.part.id}>
                                 {/* ── Item Banner Row: FRONT INFORMATION with Opening Stock & Real-time Live Stock ── */}
-                                <tr className="bg-slate-200/95 border-t-2 border-slate-300">
-                                  <td className="sticky left-0 z-20 bg-slate-200 px-4 py-2.5 font-bold border-r border-slate-300 shadow-[2px_0_6px_rgba(0,0,0,0.06)]">
+                                <tr className="border-t-2 bg-slate-100/90 border-slate-300 text-slate-800 dark:bg-slate-800/90 dark:border-slate-700 dark:text-slate-100 transition-colors">
+                                  <td className="sticky left-0 z-20 px-4 py-2.5 font-bold border-r shadow-[2px_0_6px_rgba(0,0,0,0.06)] bg-slate-100 border-slate-300 dark:bg-slate-800 dark:border-slate-700">
                                     <div className="flex items-center gap-2">
                                       <span className="px-2.5 py-0.5 rounded bg-[#e11d48] text-white font-mono font-extrabold text-xs shadow-xs tracking-wide">
                                         {item.part.id}
                                       </span>
-                                      <span className="font-extrabold text-slate-900 text-xs truncate max-w-[130px]" title={item.part.part}>
+                                      <span className="font-extrabold text-xs truncate max-w-[130px] text-slate-900 dark:text-slate-100" title={item.part.part}>
                                         {item.part.part}
                                       </span>
                                     </div>
                                   </td>
                                   <td
                                     colSpan={monthMeta.daysCount + 3}
-                                    className="px-4 py-2 text-[11px] font-semibold text-slate-700 bg-slate-200/90"
+                                    className="px-4 py-2 text-[11px] font-semibold bg-slate-100/80 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300"
                                   >
                                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                                       {/* Line badge */}
-                                      <span className="px-2 py-0.5 rounded bg-white text-slate-800 font-bold border border-slate-300 text-[10px]">
+                                      <span className="px-2 py-0.5 rounded bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-700 text-[10px]">
                                         Line {item.part.line}
                                       </span>
 
                                       {/* 📦 STOK AWAL BULAN (Pindah ke depan) */}
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-white border border-slate-300 text-slate-800 font-bold shadow-2xs">
-                                        <span className="text-slate-500 font-normal">Stok Awal:</span>
-                                        <strong className="text-slate-900 font-mono">{formatNumber(item.daily[0]?.awal ?? item.priorStock)}</strong>
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold shadow-2xs">
+                                        <span className="text-slate-500 dark:text-slate-400 font-normal">Stok Awal:</span>
+                                        <strong className="font-mono text-slate-900 dark:text-slate-100">{formatNumber(item.daily[0]?.awal ?? item.priorStock)}</strong>
                                         <span className="text-[10px] text-slate-400">pcs</span>
                                       </span>
 
                                       {/* 📥 TOTAL IN BULAN INI */}
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100/90 border border-emerald-300 text-emerald-800 font-bold">
-                                        <span className="text-emerald-700/80 font-normal text-[10px]">In:</span>
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100/90 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 font-bold">
+                                        <span className="text-emerald-700/80 dark:text-emerald-400/80 font-normal text-[10px]">In:</span>
                                         <strong className="font-mono">+{formatNumber(item.totalIn)}</strong>
                                       </span>
 
                                       {/* 📤 TOTAL OUT BULAN INI */}
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-100/90 border border-rose-300 text-rose-800 font-bold">
-                                        <span className="text-rose-700/80 font-normal text-[10px]">Out:</span>
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-100/90 dark:bg-rose-950/70 border border-rose-300 dark:border-rose-700 text-rose-800 dark:text-rose-300 font-bold">
+                                        <span className="text-rose-700/80 dark:text-rose-400/80 font-normal text-[10px]">Out:</span>
                                         <strong className="font-mono">-{formatNumber(item.totalOut)}</strong>
                                       </span>
 
@@ -1775,16 +1969,16 @@ export default function Page() {
                                       </span>
 
                                       <span className="hidden lg:inline text-slate-400">&middot;</span>
-                                      <span className="hidden lg:inline text-slate-600">
-                                        Coil: <strong className="text-slate-800">{item.part.coil}</strong> &middot; Spec: <strong className="text-slate-800">{item.part.spec}</strong>
+                                      <span className="hidden lg:inline text-slate-600 dark:text-slate-400">
+                                        Coil: <strong className="text-slate-800 dark:text-slate-200">{item.part.coil}</strong> &middot; Spec: <strong className="text-slate-800 dark:text-slate-200">{item.part.spec}</strong>
                                       </span>
                                     </div>
                                   </td>
                                 </tr>
 
                                 {/* ── Sub-row 1: IN (Barang Masuk) ── */}
-                                <tr className="hover:bg-slate-50/70 transition-colors bg-emerald-50/15">
-                                  <td className="sticky left-0 z-20 bg-emerald-50/80 px-4 py-2 text-center font-extrabold text-[11px] text-emerald-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                <tr className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors bg-emerald-50/15 dark:bg-emerald-950/20">
+                                  <td className="sticky left-0 z-20 px-4 py-2 text-center font-extrabold text-[11px] uppercase tracking-wider border-r shadow-[2px_0_6px_rgba(0,0,0,0.04)] bg-emerald-50/90 dark:bg-emerald-950/90 text-emerald-700 dark:text-emerald-400 border-slate-200 dark:border-slate-800">
                                     IN
                                   </td>
                                   {item.daily.map((d) => (
@@ -1793,30 +1987,30 @@ export default function Page() {
                                       className={`px-2 py-2 text-center font-mono text-xs border-r ${
                                         d.isToday
                                           ? d.inQty > 0
-                                            ? 'font-bold text-emerald-800 bg-amber-200/70 border-amber-400 ring-1 ring-inset ring-amber-300'
-                                            : 'text-slate-500 bg-amber-100/60 border-amber-300'
+                                            ? 'font-bold text-emerald-900 dark:text-emerald-200 bg-amber-200/80 dark:bg-amber-900/60 border-amber-400 dark:border-amber-600 ring-1 ring-inset ring-amber-300'
+                                            : 'text-slate-600 dark:text-slate-300 bg-amber-100/60 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700'
                                           : d.inQty > 0
-                                          ? 'font-bold text-emerald-700 bg-emerald-100/50 border-slate-100'
-                                          : 'text-slate-400 border-slate-100'
+                                          ? 'font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-900/30 border-slate-100 dark:border-slate-800'
+                                          : 'text-slate-400 dark:text-slate-600 border-slate-100 dark:border-slate-800/60'
                                       }`}
                                     >
                                       {d.inQty > 0 ? formatNumber(d.inQty) : 0}
                                     </td>
                                   ))}
-                                  <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-emerald-50 text-emerald-700">
+                                  <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 dark:border-slate-800 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
                                     +{formatNumber(item.totalIn)}
                                   </td>
-                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600">
                                     —
                                   </td>
-                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600">
                                     —
                                   </td>
                                 </tr>
 
                                 {/* ── Sub-row 2: OUT (Barang Keluar) ── */}
-                                <tr className="hover:bg-slate-50/70 transition-colors bg-rose-50/15">
-                                  <td className="sticky left-0 z-20 bg-rose-50/80 px-4 py-2 text-center font-extrabold text-[11px] text-rose-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                <tr className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors bg-rose-50/15 dark:bg-rose-950/20">
+                                  <td className="sticky left-0 z-20 px-4 py-2 text-center font-extrabold text-[11px] uppercase tracking-wider border-r shadow-[2px_0_6px_rgba(0,0,0,0.04)] bg-rose-50/90 dark:bg-rose-950/90 text-rose-700 dark:text-rose-400 border-slate-200 dark:border-slate-800">
                                     OUT
                                   </td>
                                   {item.daily.map((d) => (
@@ -1825,30 +2019,30 @@ export default function Page() {
                                       className={`px-2 py-2 text-center font-mono text-xs border-r ${
                                         d.isToday
                                           ? d.outQty > 0
-                                            ? 'font-bold text-rose-800 bg-amber-200/70 border-amber-400 ring-1 ring-inset ring-amber-300'
-                                            : 'text-slate-500 bg-amber-100/60 border-amber-300'
+                                            ? 'font-bold text-rose-900 dark:text-rose-200 bg-amber-200/80 dark:bg-amber-900/60 border-amber-400 dark:border-amber-600 ring-1 ring-inset ring-amber-300'
+                                            : 'text-slate-600 dark:text-slate-300 bg-amber-100/60 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700'
                                           : d.outQty > 0
-                                          ? 'font-bold text-rose-700 bg-rose-100/50 border-slate-100'
-                                          : 'text-slate-400 border-slate-100'
+                                          ? 'font-bold text-rose-700 dark:text-rose-400 bg-rose-100/50 dark:bg-rose-900/30 border-slate-100 dark:border-slate-800'
+                                          : 'text-slate-400 dark:text-slate-600 border-slate-100 dark:border-slate-800/60'
                                       }`}
                                     >
                                       {d.outQty > 0 ? formatNumber(d.outQty) : 0}
                                     </td>
                                   ))}
-                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600">
                                     —
                                   </td>
-                                  <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-rose-50 text-rose-700">
+                                  <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 dark:border-slate-800 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300">
                                     -{formatNumber(item.totalOut)}
                                   </td>
-                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600">
                                     —
                                   </td>
                                 </tr>
 
                                 {/* ── Sub-row 3: SISA (BOLD BLUE AS IN SCREENSHOT) ── */}
-                                <tr className="hover:bg-blue-50/30 transition-colors bg-blue-50/10 border-b-2 border-slate-300">
-                                  <td className="sticky left-0 z-20 bg-blue-50/90 px-4 py-2 text-center font-extrabold text-[11px] text-[#2563eb] uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                <tr className="hover:bg-blue-50/30 dark:hover:bg-blue-950/30 transition-colors bg-blue-50/10 dark:bg-blue-950/15 border-b-2 border-slate-300 dark:border-slate-700">
+                                  <td className="sticky left-0 z-20 px-4 py-2 text-center font-extrabold text-[11px] uppercase tracking-wider border-r shadow-[2px_0_6px_rgba(0,0,0,0.04)] bg-blue-50/90 dark:bg-blue-950/90 text-[#2563eb] dark:text-blue-400 border-slate-200 dark:border-slate-800">
                                     SISA
                                   </td>
                                   {item.daily.map((d) => (
@@ -1857,23 +2051,27 @@ export default function Page() {
                                       className={`px-2 py-2 text-center font-mono font-bold text-xs border-r ${
                                         d.isToday
                                           ? d.sisa < 0
-                                            ? 'text-rose-700 bg-amber-300/80 border-amber-500 ring-1 ring-inset ring-amber-400'
-                                            : 'text-amber-900 bg-amber-300/90 border-amber-500 ring-1 ring-inset ring-amber-400'
+                                            ? 'text-rose-700 dark:text-rose-300 bg-amber-300/80 dark:bg-amber-900/80 border-amber-500 dark:border-amber-600 ring-1 ring-inset ring-amber-400'
+                                            : 'text-amber-900 dark:text-amber-200 bg-amber-300/90 dark:bg-amber-900/80 border-amber-500 dark:border-amber-600 ring-1 ring-inset ring-amber-400'
                                           : d.sisa < 0
-                                          ? 'text-rose-600 bg-rose-100 border-slate-100'
-                                          : 'text-[#2563eb] border-slate-100'
+                                          ? 'text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/50 border-slate-100 dark:border-slate-800'
+                                          : 'text-[#2563eb] dark:text-blue-400 border-slate-100 dark:border-slate-800/60'
                                       }`}
                                     >
                                       {formatNumber(d.sisa)}
                                     </td>
                                   ))}
-                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600">
                                     —
                                   </td>
-                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600">
                                     —
                                   </td>
-                                  <td className={`px-3 py-2 text-right font-mono font-extrabold text-xs border-l border-slate-200 ${item.finalSisa < 0 ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  <td className={`px-3 py-2 text-right font-mono font-extrabold text-xs border-l border-slate-200 dark:border-slate-800 ${
+                                    item.finalSisa < 0
+                                      ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                                      : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
+                                  }`}>
                                     {formatNumber(item.finalSisa)}
                                   </td>
                                 </tr>
@@ -1946,14 +2144,15 @@ export default function Page() {
                 </div>
                 <button
                   onClick={handleOpenPartForm}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-[#202932] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#2c3945]"
+                  className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold text-white shadow-sm transition active:scale-95"
+                  style={{ backgroundColor: 'var(--sf-sidebar-bg)' }}
                 >
                   <Plus size={16} /> Tambah Part Baru
                 </button>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center">
+              <div className="rounded-xl border shadow-sm transition-colors" style={{ backgroundColor: 'var(--sf-card-bg)', borderColor: 'var(--sf-header-border)' }}>
+                <div className="flex flex-col justify-between gap-3 border-b p-5 sm:flex-row sm:items-center" style={{ borderColor: 'var(--sf-header-border)' }}>
                   <div>
                     <h3 className="font-bold">Daftar Barang Terdaftar</h3>
                     <p className="mt-1 text-xs text-slate-400">{parts.length} part aktif dalam sistem</p>
@@ -1964,7 +2163,8 @@ export default function Page() {
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Cari kode/part/spec..."
-                      className="w-56 rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-[#eab308]"
+                      className="w-56 rounded-lg border py-2 pl-9 pr-3 text-xs outline-none transition-colors"
+                      style={{ borderColor: 'var(--sf-header-border)', backgroundColor: 'var(--sf-card-bg)', color: 'var(--foreground)' }}
                     />
                   </div>
                 </div>
@@ -1993,7 +2193,8 @@ export default function Page() {
                 <div className="flex gap-2">
                   <button
                     onClick={handleExportCSV}
-                    className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+                    className="flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold shadow-sm transition active:scale-95"
+                    style={{ backgroundColor: 'var(--sf-card-bg)', borderColor: 'var(--sf-header-border)', color: 'var(--foreground)' }}
                   >
                     <Download size={15} /> Export CSV / Excel
                   </button>
@@ -2024,14 +2225,14 @@ export default function Page() {
                 />
               </div>
 
-              <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mt-6 rounded-xl border p-6 shadow-sm transition-colors" style={{ backgroundColor: 'var(--sf-card-bg)', borderColor: 'var(--sf-header-border)' }}>
                 <h3 className="font-bold">Laporan Saldo per Part</h3>
                 <p className="mt-1 text-xs text-slate-400">
                   Perhitungan stok awal, total penerimaan (IN), pengeluaran (OUT), dan saldo akhir
                 </p>
                 <div className="mt-5 overflow-x-auto">
                   <table className="w-full min-w-[700px] text-left text-xs">
-                    <thead className="border-b border-slate-100 text-[10px] uppercase tracking-wider text-slate-400">
+                    <thead className="border-b text-[10px] uppercase tracking-wider text-slate-400" style={{ borderColor: 'var(--sf-header-border)' }}>
                       <tr>
                         <th className="py-3 px-3">FII ID</th>
                         <th className="py-3 px-3">PART NUMBER</th>
@@ -2042,7 +2243,7 @@ export default function Page() {
                         <th className="py-3 px-3 text-right">Saldo Akhir</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {parts.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="py-8 text-center text-xs text-slate-400">
@@ -2053,18 +2254,18 @@ export default function Page() {
                         parts.map((p) => {
                           const stats = partStats[p.id] || { inQty: 0, outQty: 0, currentStock: p.opening }
                           return (
-                            <tr key={p.id} className="hover:bg-slate-50">
-                              <td className="py-4 px-3 font-bold text-slate-800">{p.id}</td>
-                              <td className="py-4 px-3 text-slate-600">{p.part}</td>
-                              <td className="py-4 px-3 font-semibold">{p.line}</td>
-                              <td className="py-4 px-3 text-right text-slate-500">{formatNumber(p.opening)}</td>
-                              <td className="py-4 px-3 text-right font-semibold text-[#29934b]">
+                            <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                              <td className="py-4 px-3 font-bold text-slate-800 dark:text-slate-100">{p.id}</td>
+                              <td className="py-4 px-3 text-slate-600 dark:text-slate-300">{p.part}</td>
+                              <td className="py-4 px-3 font-semibold text-slate-800 dark:text-slate-200">{p.line}</td>
+                              <td className="py-4 px-3 text-right text-slate-500 dark:text-slate-400">{formatNumber(p.opening)}</td>
+                              <td className="py-4 px-3 text-right font-semibold text-[#29934b] dark:text-emerald-400">
                                 {stats.inQty > 0 ? `+${formatNumber(stats.inQty)}` : '0'}
                               </td>
-                              <td className="py-4 px-3 text-right font-semibold text-[#c75a42]">
+                              <td className="py-4 px-3 text-right font-semibold text-[#c75a42] dark:text-rose-400">
                                 {stats.outQty > 0 ? `-${formatNumber(stats.outQty)}` : '0'}
                               </td>
-                              <td className="py-4 px-3 text-right font-bold text-slate-800">
+                              <td className="py-4 px-3 text-right font-bold text-slate-800 dark:text-slate-100">
                                 {formatNumber(stats.currentStock)}
                               </td>
                             </tr>
@@ -2080,24 +2281,42 @@ export default function Page() {
 
           {/* RIWAYAT PAGE */}
           {activePage === 'Riwayat' && (
-            <div className="riwayat-fade-in" style={{ minHeight: '80vh' }}>
+            <div className={`riwayat-fade-in ${theme === 'light' ? 'light-riwayat' : ''}`} style={{ minHeight: '80vh' }}>
               {/* Page Hero Header */}
               <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)' }}>
-                      <History size={18} className="text-[#202932]" />
+                    <div
+                      className="flex h-9 w-9 items-center justify-center rounded-xl shadow-xs"
+                      style={{
+                        background:
+                          theme === 'light'
+                            ? 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)'
+                            : 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)',
+                      }}
+                    >
+                      <History size={18} className={theme === 'light' ? 'text-white' : 'text-[#202932]'} />
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-slate-400">Stockflow / Riwayat</p>
-                      <h2 className="text-2xl font-bold tracking-tight">Riwayat Transaksi</h2>
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Stockflow / Riwayat</p>
+                      <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Riwayat Transaksi</h2>
                     </div>
                   </div>
-                  <p className="text-sm text-slate-400 pl-11">Log lengkap semua pergerakan stok masuk dan keluar</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 pl-11">Log lengkap semua pergerakan stok masuk dan keluar</p>
                 </div>
                 <div className="flex items-center gap-2 pl-11 sm:pl-0">
-                  <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'rgba(244,196,48,0.1)', color: '#f4c430', border: '1px solid rgba(244,196,48,0.2)' }}>
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#f4c430] animate-pulse"></span>
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+                    style={{
+                      background: theme === 'light' ? 'rgba(13,148,136,0.1)' : 'rgba(244,196,48,0.1)',
+                      color: theme === 'light' ? '#0d9488' : '#f4c430',
+                      border: theme === 'light' ? '1px solid rgba(13,148,136,0.2)' : '1px solid rgba(244,196,48,0.2)',
+                    }}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full animate-pulse"
+                      style={{ background: theme === 'light' ? '#0d9488' : '#f4c430' }}
+                    />
                     {riwayatFiltered.length} transaksi ditemukan
                   </span>
                 </div>
@@ -2106,61 +2325,94 @@ export default function Page() {
               {/* Stats Row */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 {/* Total Transaksi */}
-                <div className="rounded-2xl p-5 stat-glow-yellow" style={{ background: 'linear-gradient(135deg, #202932 0%, #263240 100%)', border: '1px solid rgba(244,196,48,0.15)' }}>
+                <div
+                  className={`rounded-2xl p-5 ${theme === 'light' ? 'stat-glow-teal bg-white border border-teal-100 shadow-sm' : 'stat-glow-yellow'}`}
+                  style={theme === 'dark' ? { background: 'linear-gradient(135deg, #202932 0%, #263240 100%)', border: '1px solid rgba(244,196,48,0.15)' } : {}}
+                >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs font-semibold mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>TOTAL TRANSAKSI</p>
-                      <p className="text-3xl font-bold" style={{ color: '#f4c430' }}>{formatNumber(riwayatFiltered.length)}</p>
-                      <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>dalam rentang tanggal dipilih</p>
+                      <p className="text-xs font-semibold mb-3 text-slate-400 dark:text-white/40">TOTAL TRANSAKSI</p>
+                      <p className="text-3xl font-bold" style={{ color: theme === 'light' ? '#0d9488' : '#f4c430' }}>
+                        {formatNumber(riwayatFiltered.length)}
+                      </p>
+                      <p className="text-[11px] mt-1 text-slate-400 dark:text-white/30">dalam rentang tanggal dipilih</p>
                     </div>
-                    <div className="rounded-xl p-2.5" style={{ background: 'rgba(244,196,48,0.1)' }}>
-                      <History size={20} style={{ color: '#f4c430' }} />
+                    <div
+                      className="rounded-xl p-2.5"
+                      style={{ background: theme === 'light' ? 'rgba(13,148,136,0.1)' : 'rgba(244,196,48,0.1)' }}
+                    >
+                      <History size={20} style={{ color: theme === 'light' ? '#0d9488' : '#f4c430' }} />
                     </div>
                   </div>
                 </div>
                 {/* Transaksi Masuk */}
-                <div className="rounded-2xl p-5 stat-glow-green" style={{ background: 'linear-gradient(135deg, #1a2920 0%, #1e3125 100%)', border: '1px solid rgba(74,222,128,0.12)' }}>
+                <div
+                  className={`rounded-2xl p-5 ${theme === 'light' ? 'bg-white border border-emerald-100 shadow-sm' : 'stat-glow-green'}`}
+                  style={theme === 'dark' ? { background: 'linear-gradient(135deg, #1a2920 0%, #1e3125 100%)', border: '1px solid rgba(74,222,128,0.12)' } : {}}
+                >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs font-semibold mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>BARANG MASUK (IN)</p>
-                      <p className="text-3xl font-bold" style={{ color: '#4ade80' }}>
+                      <p className="text-xs font-semibold mb-3 text-slate-400 dark:text-white/40">BARANG MASUK (IN)</p>
+                      <p className="text-3xl font-bold text-emerald-600 dark:text-[#4ade80]">
                         {formatNumber(riwayatFiltered.filter(m => m.type === 'IN').reduce((s, m) => s + m.qty, 0))}
                       </p>
-                      <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      <p className="text-[11px] mt-1 text-slate-400 dark:text-white/30">
                         {riwayatFiltered.filter(m => m.type === 'IN').length} transaksi masuk
                       </p>
                     </div>
-                    <div className="rounded-xl p-2.5" style={{ background: 'rgba(74,222,128,0.1)' }}>
-                      <ArrowDownToLine size={20} style={{ color: '#4ade80' }} />
+                    <div className="rounded-xl p-2.5 bg-emerald-500/10">
+                      <ArrowDownToLine size={20} className="text-emerald-600 dark:text-[#4ade80]" />
                     </div>
                   </div>
                 </div>
                 {/* Transaksi Keluar */}
-                <div className="rounded-2xl p-5 stat-glow-blue" style={{ background: 'linear-gradient(135deg, #201a1a 0%, #291e1e 100%)', border: '1px solid rgba(248,113,113,0.12)' }}>
+                <div
+                  className={`rounded-2xl p-5 ${theme === 'light' ? 'bg-white border border-rose-100 shadow-sm' : 'stat-glow-blue'}`}
+                  style={theme === 'dark' ? { background: 'linear-gradient(135deg, #201a1a 0%, #291e1e 100%)', border: '1px solid rgba(248,113,113,0.12)' } : {}}
+                >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs font-semibold mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>BARANG KELUAR (OUT)</p>
-                      <p className="text-3xl font-bold" style={{ color: '#f87171' }}>
+                      <p className="text-xs font-semibold mb-3 text-slate-400 dark:text-white/40">BARANG KELUAR (OUT)</p>
+                      <p className="text-3xl font-bold text-rose-600 dark:text-[#f87171]">
                         {formatNumber(riwayatFiltered.filter(m => m.type === 'OUT').reduce((s, m) => s + m.qty, 0))}
                       </p>
-                      <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      <p className="text-[11px] mt-1 text-slate-400 dark:text-white/30">
                         {riwayatFiltered.filter(m => m.type === 'OUT').length} transaksi keluar
                       </p>
                     </div>
-                    <div className="rounded-xl p-2.5" style={{ background: 'rgba(248,113,113,0.1)' }}>
-                      <ArrowUpFromLine size={20} style={{ color: '#f87171' }} />
+                    <div className="rounded-xl p-2.5 bg-rose-500/10">
+                      <ArrowUpFromLine size={20} className="text-rose-600 dark:text-[#f87171]" />
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Main Card */}
-              <div className="rounded-2xl overflow-hidden" style={{ background: '#202932', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}>
+              <div
+                className="rounded-2xl overflow-hidden transition-colors"
+                style={
+                  theme === 'light'
+                    ? { background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }
+                    : { background: '#202932', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }
+                }
+              >
                 {/* Filter Bar */}
-                <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+                <div
+                  className="p-5 transition-colors"
+                  style={
+                    theme === 'light'
+                      ? { borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }
+                      : { borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }
+                  }
+                >
                   {/* Tablet Quick Range Chips */}
-                  <div className="mb-3.5 flex flex-wrap items-center gap-1.5 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <span className="text-[10px] font-bold uppercase tracking-widest mr-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  <div
+                    className="mb-3.5 flex flex-wrap items-center gap-1.5 pb-3"
+                    style={{
+                      borderBottom: theme === 'light' ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.05)',
+                    }}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-widest mr-1 text-slate-500 dark:text-white/40">
                       Rentang Cepat:
                     </span>
                     {[
@@ -2218,7 +2470,11 @@ export default function Page() {
                           }}
                           className={`text-xs px-3 py-1.5 rounded-xl font-bold transition active:scale-95 ${
                             isActive
-                              ? 'bg-[#f4c430] text-[#202932] shadow-sm'
+                              ? theme === 'light'
+                                ? 'bg-teal-600 text-white shadow-sm'
+                                : 'bg-[#f4c430] text-[#202932] shadow-sm'
+                              : theme === 'light'
+                              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
                               : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
                           }`}
                         >
@@ -2231,11 +2487,11 @@ export default function Page() {
                   <div className="flex flex-wrap items-end gap-3">
                     {/* Dari Tanggal */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-white/35">
                         Dari Tanggal
                       </label>
                       <div className="relative">
-                        <Calendar size={13} className="absolute left-3 top-2.5" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                        <Calendar size={13} className="absolute left-3 top-2.5 text-slate-400 dark:text-white/30" />
                         <input
                           id="riwayat-from-date"
                           type="date"
@@ -2248,11 +2504,11 @@ export default function Page() {
 
                     {/* Sampai Tanggal */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-white/35">
                         Sampai Tanggal
                       </label>
                       <div className="relative">
-                        <Calendar size={13} className="absolute left-3 top-2.5" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                        <Calendar size={13} className="absolute left-3 top-2.5 text-slate-400 dark:text-white/30" />
                         <input
                           id="riwayat-to-date"
                           type="date"
@@ -2265,7 +2521,7 @@ export default function Page() {
 
                     {/* Part Selector */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-white/35">
                         Item / Part
                       </label>
                       <select
@@ -2274,9 +2530,9 @@ export default function Page() {
                         onChange={(e) => { setRiwayatPartFilter(e.target.value); setRiwayatPage(1) }}
                         className="riwayat-filter-input rounded-xl px-3 py-2 text-xs min-w-[180px] cursor-pointer"
                       >
-                        <option value="ALL" style={{ background: '#202932' }}>SEMUA ITEM</option>
+                        <option value="ALL">SEMUA ITEM</option>
                         {parts.map((p) => (
-                          <option key={p.id} value={p.id} style={{ background: '#202932' }}>
+                          <option key={p.id} value={p.id}>
                             {p.id} — {p.part}
                           </option>
                         ))}
@@ -2285,16 +2541,27 @@ export default function Page() {
 
                     {/* Filter Tipe IN / OUT */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-white/35">
                         Tipe
                       </label>
-                      <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div
+                        className="flex items-center gap-1 rounded-xl p-1"
+                        style={
+                          theme === 'light'
+                            ? { background: '#f1f5f9', border: '1px solid #cbd5e1' }
+                            : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }
+                        }
+                      >
                         <button
                           type="button"
                           onClick={() => { setRiwayatTypeFilter('ALL'); setRiwayatPage(1) }}
                           className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
                             riwayatTypeFilter === 'ALL'
-                              ? 'bg-[#f4c430] text-[#202932] shadow-sm'
+                              ? theme === 'light'
+                                ? 'bg-teal-600 text-white shadow-sm'
+                                : 'bg-[#f4c430] text-[#202932] shadow-sm'
+                              : theme === 'light'
+                              ? 'text-slate-600 hover:text-slate-900'
                               : 'text-slate-400 hover:text-white'
                           }`}
                         >
@@ -2306,7 +2573,7 @@ export default function Page() {
                           className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
                             riwayatTypeFilter === 'IN'
                               ? 'bg-emerald-500 text-white shadow-sm'
-                              : 'text-emerald-400 hover:bg-emerald-500/10'
+                              : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
                           }`}
                         >
                           <ArrowDownToLine size={12} /> IN
@@ -2317,7 +2584,7 @@ export default function Page() {
                           className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
                             riwayatTypeFilter === 'OUT'
                               ? 'bg-rose-500 text-white shadow-sm'
-                              : 'text-rose-400 hover:bg-rose-500/10'
+                              : 'text-rose-600 dark:text-rose-400 hover:bg-rose-500/10'
                           }`}
                         >
                           <ArrowUpFromLine size={12} /> OUT
@@ -2327,11 +2594,11 @@ export default function Page() {
 
                     {/* Search */}
                     <div className="flex flex-col gap-1.5 flex-1 min-w-[180px]">
-                      <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-white/35">
                         Cari
                       </label>
                       <div className="relative">
-                        <Search size={13} className="absolute left-3 top-2.5" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                        <Search size={13} className="absolute left-3 top-2.5 text-slate-400 dark:text-white/30" />
                         <input
                           id="riwayat-search"
                           type="text"
@@ -2348,8 +2615,12 @@ export default function Page() {
                       <button
                         id="riwayat-search-btn"
                         onClick={handleRiwayatSearch}
-                        className="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition"
-                        style={{ background: 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)', color: '#202932' }}
+                        className="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition active:scale-95"
+                        style={
+                          theme === 'light'
+                            ? { background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', color: '#ffffff' }
+                            : { background: 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)', color: '#202932' }
+                        }
                       >
                         <Search size={13} />
                         Cari
@@ -2357,10 +2628,12 @@ export default function Page() {
                       <button
                         id="riwayat-reset-btn"
                         onClick={handleRiwayatReset}
-                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition"
-                        style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)' }}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition active:scale-95"
+                        style={
+                          theme === 'light'
+                            ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' }
+                            : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.08)' }
+                        }
                       >
                         <RotateCcw size={13} />
                       </button>
@@ -2371,17 +2644,24 @@ export default function Page() {
                 {/* Table or Empty */}
                 {riwayatFiltered.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-4">
-                    <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)' }}>
-                      <History size={36} style={{ color: 'rgba(255,255,255,0.15)' }} />
+                    <div
+                      className="rounded-2xl p-5"
+                      style={{ background: theme === 'light' ? '#f0fdfa' : 'rgba(255,255,255,0.04)' }}
+                    >
+                      <History size={36} style={{ color: theme === 'light' ? '#0d9488' : 'rgba(255,255,255,0.15)' }} />
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.4)' }}>Tidak ada transaksi ditemukan</p>
-                      <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>Coba ubah filter tanggal atau pilih item yang berbeda</p>
+                      <p className="text-sm font-semibold text-slate-600 dark:text-white/40">Tidak ada transaksi ditemukan</p>
+                      <p className="text-xs mt-1 text-slate-400 dark:text-white/20">Coba ubah filter tanggal atau pilih item yang berbeda</p>
                     </div>
                     <button
                       onClick={handleRiwayatReset}
                       className="text-xs font-bold px-4 py-2 rounded-xl transition"
-                      style={{ color: '#f4c430', background: 'rgba(244,196,48,0.08)', border: '1px solid rgba(244,196,48,0.15)' }}
+                      style={
+                        theme === 'light'
+                          ? { color: '#0d9488', background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.2)' }
+                          : { color: '#f4c430', background: 'rgba(244,196,48,0.08)', border: '1px solid rgba(244,196,48,0.15)' }
+                      }
                     >
                       Reset Filter
                     </button>
@@ -2398,9 +2678,14 @@ export default function Page() {
 
                     {/* Pagination */}
                     {riwayatTotalPages > 1 && (
-                      <div className="flex items-center justify-between px-5 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                          Halaman <span style={{ color: 'rgba(255,255,255,0.6)' }}>{riwayatPage}</span> dari <span style={{ color: 'rgba(255,255,255,0.6)' }}>{riwayatTotalPages}</span>
+                      <div
+                        className="flex items-center justify-between px-5 py-4"
+                        style={{
+                          borderTop: theme === 'light' ? '1px solid #f1f5f9' : '1px solid rgba(255,255,255,0.05)',
+                        }}
+                      >
+                        <p className="text-xs text-slate-500 dark:text-white/30">
+                          Halaman <span className="font-semibold text-slate-800 dark:text-white/60">{riwayatPage}</span> dari <span className="font-semibold text-slate-800 dark:text-white/60">{riwayatTotalPages}</span>
                           &nbsp;&middot;&nbsp;{riwayatFiltered.length} total transaksi
                         </p>
                         <div className="flex items-center gap-2">
@@ -2408,8 +2693,12 @@ export default function Page() {
                             id="riwayat-prev-page"
                             onClick={() => setRiwayatPage(p => Math.max(1, p - 1))}
                             disabled={riwayatPage === 1}
-                            className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition disabled:opacity-30"
-                            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+                            className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition disabled:opacity-30 active:scale-95"
+                            style={
+                              theme === 'light'
+                                ? { background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1' }
+                                : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                            }
                           >
                             <ChevronLeft size={13} /> Prev
                           </button>
@@ -2420,10 +2709,15 @@ export default function Page() {
                               <button
                                 key={page}
                                 onClick={() => setRiwayatPage(page)}
-                                className="w-8 h-8 rounded-xl text-xs font-bold transition"
-                                style={page === riwayatPage
-                                  ? { background: '#f4c430', color: '#202932' }
-                                  : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.07)' }
+                                className="w-8 h-8 rounded-xl text-xs font-bold transition active:scale-95"
+                                style={
+                                  page === riwayatPage
+                                    ? theme === 'light'
+                                      ? { background: '#0d9488', color: '#ffffff' }
+                                      : { background: '#f4c430', color: '#202932' }
+                                    : theme === 'light'
+                                    ? { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }
+                                    : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.07)' }
                                 }
                               >
                                 {page}
@@ -2434,8 +2728,12 @@ export default function Page() {
                             id="riwayat-next-page"
                             onClick={() => setRiwayatPage(p => Math.min(riwayatTotalPages, p + 1))}
                             disabled={riwayatPage === riwayatTotalPages}
-                            className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition disabled:opacity-30"
-                            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+                            className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition disabled:opacity-30 active:scale-95"
+                            style={
+                              theme === 'light'
+                                ? { background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1' }
+                                : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                            }
                           >
                             Next <ChevronRight size={13} />
                           </button>
@@ -2455,14 +2753,30 @@ export default function Page() {
         <button
           onClick={handleOpenMovementForm}
           title="Input Pergerakan Cepat"
-          className="flex items-center gap-2.5 rounded-2xl px-4 py-3.5 text-xs sm:text-sm font-bold shadow-2xl hover:scale-105 active:scale-95 transition-all duration-150 border border-amber-300/40"
-          style={{
-            background: 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)',
-            color: '#202932',
-            boxShadow: '0 10px 25px -4px rgba(244, 196, 48, 0.45), 0 6px 12px -3px rgba(0, 0, 0, 0.25)',
-          }}
+          className="flex items-center gap-2.5 rounded-2xl px-4 py-3.5 text-xs sm:text-sm font-bold shadow-2xl hover:scale-105 active:scale-95 transition-all duration-150 border"
+          style={
+            theme === 'light'
+              ? {
+                  background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                  color: '#ffffff',
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  boxShadow: '0 10px 25px -4px rgba(13, 148, 136, 0.45), 0 6px 12px -3px rgba(0, 0, 0, 0.25)',
+                }
+              : {
+                  background: 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)',
+                  color: '#202932',
+                  borderColor: 'rgba(244, 196, 48, 0.4)',
+                  boxShadow: '0 10px 25px -4px rgba(244, 196, 48, 0.45), 0 6px 12px -3px rgba(0, 0, 0, 0.25)',
+                }
+          }
         >
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#202932] text-white">
+          <div
+            className="flex h-6 w-6 items-center justify-center rounded-lg"
+            style={{
+              background: theme === 'light' ? 'rgba(255,255,255,0.2)' : '#202932',
+              color: '#ffffff',
+            }}
+          >
             <Plus size={15} className="stroke-[3]" />
           </div>
           <span className="font-extrabold tracking-wide">Input Mutasi</span>
@@ -2823,7 +3137,8 @@ export default function Page() {
                 type="button"
                 disabled={parts.length === 0}
                 onClick={handleAddMovement}
-                className="rounded-xl bg-[#202932] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#2c3945] disabled:opacity-50 shadow-sm transition active:scale-95"
+                className="rounded-xl px-6 py-2.5 text-sm font-bold text-white disabled:opacity-50 shadow-sm transition active:scale-95"
+                style={{ backgroundColor: 'var(--sf-sidebar-bg)' }}
               >
                 {editingMovementId ? '💾 Simpan Perubahan' : '💾 Simpan Transaksi'}
               </button>
@@ -3267,7 +3582,8 @@ export default function Page() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-[#202932] px-5 py-2 text-xs font-bold text-white hover:bg-[#2c3945] shadow-sm"
+                  className="rounded-lg px-5 py-2 text-xs font-bold text-white shadow-sm transition active:scale-95"
+                  style={{ backgroundColor: 'var(--sf-sidebar-bg)' }}
                 >
                   Simpan Master Part
                 </button>
@@ -3293,27 +3609,31 @@ function StatCard({
   icon: typeof Boxes
   tone: string
 }) {
-  const styles: Record<string, string> = {
-    blue: 'bg-[#edf3f7] text-[#567487]',
-    green: 'bg-[#eaf6ed] text-[#29934b]',
-    orange: 'bg-[#fff3e7] text-[#d67b27]',
-    yellow: 'bg-[#fff8d9] text-[#b58a00]',
+  const toneClasses: Record<string, string> = {
+    blue:   'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400',
+    green:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+    orange: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
+    yellow: 'bg-teal-100 text-teal-800 dark:bg-amber-400/15 dark:text-[#f4c430]',
   }
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+    <div
+      className="rounded-xl border p-5 shadow-xs transition-colors"
+      style={{ borderColor: 'var(--sf-header-border)', backgroundColor: 'var(--sf-card-bg)' }}
+    >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-semibold text-slate-500">{label}</p>
-          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-800">{value}</p>
-          <p className="mt-1 text-[11px] text-slate-400">{detail}</p>
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</p>
+          <p className="mt-3 text-2xl font-bold tracking-tight" style={{ color: 'var(--foreground)' }}>{value}</p>
+          <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{detail}</p>
         </div>
-        <div className={`rounded-lg p-2.5 ${styles[tone]}`}>
+        <div className={`rounded-lg p-2.5 ${toneClasses[tone] || toneClasses.blue}`}>
           <Icon size={19} />
         </div>
       </div>
     </div>
   )
 }
+
 
 function LineBar({
   label,
@@ -3329,12 +3649,12 @@ function LineBar({
   return (
     <div>
       <div className="mb-2 flex justify-between text-xs">
-        <span className="font-bold text-slate-700">Line {label}</span>
-        <span className="font-semibold text-slate-500">
+        <span className="font-bold text-slate-700 dark:text-slate-300">Line {label}</span>
+        <span className="font-semibold text-slate-500 dark:text-slate-400">
           {amount} <span className="font-normal text-slate-400">units ({value}%)</span>
         </span>
       </div>
-      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+      <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
         <div className={`h-2 rounded-full ${color} transition-all duration-300`} style={{ width: `${value}%` }} />
       </div>
     </div>
@@ -3357,7 +3677,7 @@ function MovementTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-xs">
-        <thead className="bg-[#fafbfc] text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
+        <thead className="bg-[#fafbfc] dark:bg-slate-800/80 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
           <tr>
             <th className="px-5 py-3 font-bold">No Transaksi</th>
             <th className="px-3 py-3 font-bold">Barang / Part</th>
@@ -3368,22 +3688,22 @@ function MovementTable({
             <th className="px-4 py-3 text-center font-bold">Aksi</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
           {movements.map((m) => {
             const partInfo = parts.find((p) => p.id === m.partId)
             return (
               <tr
                 key={m.id}
                 onClick={() => onEdit?.(m)}
-                className="hover:bg-slate-50/80 cursor-pointer transition group"
+                className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 cursor-pointer transition group"
               >
-                <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-700">{m.id}</td>
+                <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-700 dark:text-slate-200">{m.id}</td>
                 <td className="px-3 py-4">
-                  <p className="font-bold text-slate-800">{m.partId}</p>
+                  <p className="font-bold text-slate-800 dark:text-slate-100">{m.partId}</p>
                   <p className="mt-0.5 text-[10px] text-slate-400">{partInfo?.part || 'Part'}</p>
                 </td>
-                <td className="whitespace-nowrap px-3 py-4 text-slate-500">
-                  <p className="font-semibold text-slate-700">{parseDateTimeString(m.date).date}</p>
+                <td className="whitespace-nowrap px-3 py-4 text-slate-500 dark:text-slate-400">
+                  <p className="font-semibold text-slate-700 dark:text-slate-200">{parseDateTimeString(m.date).date}</p>
                   {parseDateTimeString(m.date).time && (
                     <p className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
                       <Clock size={10} />
@@ -3391,11 +3711,13 @@ function MovementTable({
                     </p>
                   )}
                 </td>
-                <td className="px-3 py-4 text-slate-500 max-w-[180px] truncate">{m.note}</td>
+                <td className="px-3 py-4 text-slate-500 dark:text-slate-400 max-w-[180px] truncate">{m.note}</td>
                 <td className="px-3 py-4">
                   <span
                     className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold ${
-                      m.type === 'IN' ? 'bg-[#e7f5eb] text-[#29934b]' : 'bg-[#fff0eb] text-[#c75a42]'
+                      m.type === 'IN'
+                        ? 'bg-[#e7f5eb] dark:bg-emerald-950/60 text-[#29934b] dark:text-emerald-400'
+                        : 'bg-[#fff0eb] dark:bg-rose-950/60 text-[#c75a42] dark:text-rose-400'
                     }`}
                   >
                     {m.type === 'IN' ? <ArrowDownToLine size={12} /> : <ArrowUpFromLine size={12} />}
@@ -3404,7 +3726,7 @@ function MovementTable({
                 </td>
                 <td
                   className={`px-5 py-4 text-right font-bold ${
-                    m.type === 'IN' ? 'text-[#29934b]' : 'text-[#c75a42]'
+                    m.type === 'IN' ? 'text-[#29934b] dark:text-emerald-400' : 'text-[#c75a42] dark:text-rose-400'
                   }`}
                 >
                   {m.type === 'IN' ? '+' : '-'}
@@ -3470,7 +3792,7 @@ function PartTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[750px] text-left text-xs">
-        <thead className="bg-[#fafbfc] text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
+        <thead className="bg-[#fafbfc] dark:bg-slate-800/80 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
           <tr>
             <th className="px-5 py-3">FII ID</th>
             <th className="px-3 py-3">PART NUMBER</th>
@@ -3482,22 +3804,22 @@ function PartTable({
             <th className="px-4 py-3 text-center">Aksi</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
           {parts.map((p) => {
             const current = partStats[p.id]?.currentStock ?? p.opening
             return (
-              <tr key={p.id} className="hover:bg-slate-50/80 transition">
-                <td className="px-5 py-4 font-bold text-slate-800">{p.id}</td>
-                <td className="px-3 py-4 font-semibold text-slate-700">{p.part}</td>
-                <td className="px-3 py-4 text-slate-500">{p.coil}</td>
-                <td className="px-3 py-4 text-slate-500">{p.spec}</td>
+              <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                <td className="px-5 py-4 font-bold text-slate-800 dark:text-slate-100">{p.id}</td>
+                <td className="px-3 py-4 font-semibold text-slate-700 dark:text-slate-200">{p.part}</td>
+                <td className="px-3 py-4 text-slate-500 dark:text-slate-400">{p.coil}</td>
+                <td className="px-3 py-4 text-slate-500 dark:text-slate-400">{p.spec}</td>
                 <td className="px-3 py-4">
-                  <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                  <span className="rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                     {p.line}
                   </span>
                 </td>
-                <td className="px-3 py-4 text-right text-slate-400">{formatNumber(p.opening)}</td>
-                <td className="px-3 py-4 text-right font-bold text-slate-900 text-sm">
+                <td className="px-3 py-4 text-right text-slate-400 dark:text-slate-500">{formatNumber(p.opening)}</td>
+                <td className="px-3 py-4 text-right font-bold text-slate-900 dark:text-slate-100 text-sm">
                   {formatNumber(current)}
                 </td>
                 <td className="px-4 py-4 text-center">
@@ -3563,11 +3885,10 @@ function RiwayatTable({
             <th className="px-4 py-3.5 text-center">Aksi</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-white/[0.04]">
+        <tbody className="divide-y divide-slate-100 dark:divide-white/[0.04]">
           {movements.map((m) => {
             const partInfo = parts.find((p) => p.id === m.partId)
             const isIN = m.type === 'IN'
-            const userInitial = (currentUser || 'O').charAt(0).toUpperCase()
 
             return (
               <tr
@@ -3580,7 +3901,7 @@ function RiwayatTable({
                   <div className="flex items-center gap-2.5">
                     <div
                       className={`w-1 h-7 rounded-full shrink-0 ${
-                        isIN ? 'bg-emerald-400' : 'bg-rose-400'
+                        isIN ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-rose-500 dark:bg-rose-400'
                       }`}
                       style={{
                         boxShadow: isIN
@@ -3589,16 +3910,16 @@ function RiwayatTable({
                       }}
                     />
                     <div>
-                      <div className="flex items-center gap-1.5 text-slate-200 font-semibold text-xs">
-                        <Clock size={12} className="text-[#f4c430]/80" />
+                      <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-semibold text-xs">
+                        <Clock size={12} style={{ color: 'var(--sf-brand)' }} />
                         <span>{parseDateTimeString(m.date).date}</span>
                         {parseDateTimeString(m.date).time && (
-                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-semibold border border-white/5">
+                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-teal-800 dark:text-amber-300 font-semibold border border-slate-200 dark:border-white/5">
                             {parseDateTimeString(m.date).time}
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5 max-w-[150px] truncate">
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 max-w-[150px] truncate">
                         {m.note || m.id}
                       </p>
                     </div>
@@ -3610,16 +3931,16 @@ function RiwayatTable({
                   <div className="flex flex-col gap-0.5">
                     <span
                       className="font-mono font-bold text-xs inline-block"
-                      style={{ color: '#f4c430' }}
+                      style={{ color: 'var(--sf-brand)' }}
                     >
                       {partInfo?.part || m.partId}
                     </span>
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                      <span className="font-semibold text-slate-300">{m.partId}</span>
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{m.partId}</span>
                       {partInfo?.line && (
                         <>
                           <span>&middot;</span>
-                          <span className="px-1.5 py-0.2 rounded bg-white/5 text-slate-300">
+                          <span className="px-1.5 py-0.2 rounded bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300">
                             Line {partInfo.line}
                           </span>
                         </>
@@ -3633,8 +3954,8 @@ function RiwayatTable({
                   <span
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
                       isIN
-                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-rose-500/15 text-rose-400 border border-rose-500/20'
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
                     }`}
                   >
                     {isIN ? (
@@ -3657,23 +3978,23 @@ function RiwayatTable({
                             ? 'linear-gradient(135deg, rgba(41,147,75,0.35) 0%, rgba(41,147,75,0.1) 100%)'
                             : m.role === 'PRODUCTION'
                             ? 'linear-gradient(135deg, rgba(239,68,68,0.35) 0%, rgba(239,68,68,0.1) 100%)'
-                            : 'linear-gradient(135deg, rgba(244,196,48,0.25) 0%, rgba(244,196,48,0.08) 100%)',
+                            : 'var(--sf-brand-light)',
                         color:
                           m.role === 'RECEIVING'
                             ? '#34d399'
                             : m.role === 'PRODUCTION'
                             ? '#f87171'
-                            : '#f4c430',
-                        border: '1px solid rgba(255,255,255,0.15)',
+                            : 'var(--sf-brand)',
+                        border: '1px solid var(--sf-brand-light)',
                       }}
                     >
                       {(m.operator || currentUser || 'O').charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <span className="text-xs font-medium text-slate-200 block">
+                      <span className="text-xs font-medium text-slate-800 dark:text-slate-200 block">
                         {m.operator || currentUser}
                       </span>
-                      <span className="text-[10px] text-slate-400 block -mt-0.5">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block -mt-0.5">
                         {m.role && ROLES[m.role as UserRole]
                           ? ROLES[m.role as UserRole].label
                           : 'Operator Gudang'}
@@ -3691,7 +4012,7 @@ function RiwayatTable({
                 <td className="px-5 py-3.5 text-right whitespace-nowrap">
                   <span
                     className={`font-mono font-bold text-sm ${
-                      isIN ? 'text-emerald-400' : 'text-rose-400'
+                      isIN ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                     }`}
                   >
                     {isIN ? '+' : '-'}
@@ -3713,7 +4034,7 @@ function RiwayatTable({
                         }
                       }}
                       title="Edit transaksi"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-[#f4c430] hover:bg-white/5 transition"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 dark:hover:text-[#f4c430] hover:bg-slate-100 dark:hover:bg-white/5 transition"
                     >
                       <Edit2 size={13} />
                     </button>
