@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState, useEffect, Fragment } from 'react'
+import React, { useMemo, useState, useEffect, useRef, Fragment } from 'react'
 import {
   ArrowDownToLine,
   ArrowLeftRight,
@@ -21,6 +21,8 @@ import {
   History,
   LayoutDashboard,
   Lock,
+  Maximize2,
+  Minimize2,
   MoreHorizontal,
   PackageCheck,
   Plus,
@@ -30,6 +32,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Trash2,
+  Tv,
   User,
   Warehouse,
   X,
@@ -201,6 +204,44 @@ export default function Page() {
   const [monthlyLineFilter, setMonthlyLineFilter] = useState('All lines')
   const [monthlySearch, setMonthlySearch] = useState('')
   const [stockMovementView, setStockMovementView] = useState<'matrix' | 'list'>('matrix')
+
+  // Fullscreen TV 52" mode
+  const [isTvFullscreen, setIsTvFullscreen] = useState(false)
+  const tvContainerRef = useRef<HTMLDivElement>(null)
+  const [currentClock, setCurrentClock] = useState(() => new Date())
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentClock(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    function onFullscreenChange() {
+      setIsTvFullscreen(Boolean(document.fullscreenElement))
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
+  function handleToggleTvFullscreen() {
+    if (!document.fullscreenElement) {
+      if (tvContainerRef.current?.requestFullscreen) {
+        tvContainerRef.current.requestFullscreen().catch(() => {
+          setIsTvFullscreen(true)
+        })
+      } else {
+        setIsTvFullscreen(true)
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {
+          setIsTvFullscreen(false)
+        })
+      } else {
+        setIsTvFullscreen(false)
+      }
+    }
+  }
 
   // Role state (RBAC Simulator)
   const [currentRole, setCurrentRole] = useState<UserRole>('SUPERVISOR')
@@ -1020,56 +1061,136 @@ export default function Page() {
 
           {/* STOCK MOVEMENT (STOCK BULANAN) PAGE */}
           {activePage === 'Stock Movement' && (
-            <>
-              {/* Top Dark Header Bar (PKIS / Factory style, elevated modern) */}
-              <div className="mb-6 rounded-2xl bg-[#17202b] text-white p-4 sm:p-5 shadow-lg border border-slate-800 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f4c430]/15 text-[#f4c430] border border-[#f4c430]/20 shadow-inner">
-                    <ClipboardList size={22} strokeWidth={2.5} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-xl font-bold tracking-tight text-white">Stock Bulanan</h2>
-                      <span className="hidden sm:inline-block rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
-                        Laporan Harian
-                      </span>
+            <div
+              ref={tvContainerRef}
+              className={
+                isTvFullscreen
+                  ? 'fixed inset-0 z-50 bg-[#0b1320] text-slate-100 overflow-y-auto p-4 sm:p-7 flex flex-col min-h-screen'
+                  : 'relative'
+              }
+            >
+              {/* Specialized Fullscreen TV 52" Header (when in TV Mode) */}
+              {isTvFullscreen ? (
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-4 bg-slate-900/95 border border-slate-700/80 p-4 sm:p-5 rounded-2xl shadow-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400/20 text-amber-400 border border-amber-400/30">
+                      <Tv size={26} strokeWidth={2.5} />
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Monitoring saldo awal, mutasi masuk/keluar, dan sisa stok harian selama 1 bulan penuh
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h1 className="text-xl sm:text-2xl font-black tracking-wider uppercase text-white">
+                          ANDON PRODUCTION MONITORING &bull; STOCK BULANAN
+                        </h1>
+                        <span className="rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3 py-0.5 text-xs font-bold text-emerald-400">
+                          TV 52&quot; DISPLAY
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Pusat Kontrol Persediaan Material &bull; Periode: <strong className="text-amber-300">{monthMeta.labelIndo}</strong> ({monthMeta.daysCount} Hari)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Digital Clock in Center */}
+                  <div className="flex items-center gap-3 bg-slate-950/90 border border-slate-800 px-5 py-2.5 rounded-xl shadow-inner">
+                    <Clock size={22} className="text-amber-400 animate-pulse" />
+                    <div>
+                      <div className="font-mono font-black text-2xl tracking-widest text-amber-300">
+                        {currentClock.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}{' '}
+                        <span className="text-xs font-semibold text-slate-400">WIB</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-medium">
+                        {currentClock.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action buttons in Fullscreen */}
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleExportMonthlyStockExcel}
+                      className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition active:scale-95"
+                    >
+                      <FileSpreadsheet size={16} />
+                      <span>Export Excel</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleToggleTvFullscreen}
+                      className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition active:scale-95"
+                    >
+                      <Minimize2 size={16} />
+                      <span>Keluar (Esc)</span>
+                    </button>
                   </div>
                 </div>
+              ) : (
+                /* Standard Top Dark Header Bar */
+                <div className="mb-6 rounded-2xl bg-[#17202b] text-white p-4 sm:p-5 shadow-lg border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f4c430]/15 text-[#f4c430] border border-[#f4c430]/20 shadow-inner">
+                      <ClipboardList size={22} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-bold tracking-tight text-white">Stock Bulanan</h2>
+                        <span className="hidden sm:inline-block rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
+                          Laporan Harian
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Monitoring saldo awal, mutasi masuk/keluar, dan sisa stok harian selama 1 bulan penuh
+                      </p>
+                    </div>
+                  </div>
 
-                <div className="flex items-center gap-2.5">
-                  <button
-                    onClick={() => setActivePage('Dashboard')}
-                    title="Kembali ke Dashboard Utama"
-                    className="px-4 py-2 rounded-xl bg-[#e11d48] hover:bg-[#be123c] text-white text-xs font-extrabold uppercase tracking-wider shadow-sm transition active:scale-95 flex items-center gap-1.5"
-                  >
-                    <ChevronLeft size={15} /> KEMBALI
-                  </button>
-                  <button
-                    onClick={handleOpenMovementForm}
-                    className="flex items-center justify-center gap-1.5 rounded-xl bg-[#f4c430] hover:bg-[#eab308] px-4 py-2 text-xs font-bold text-[#17202b] shadow-sm transition active:scale-95"
-                  >
-                    <Plus size={16} /> Input Mutasi
-                  </button>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setActivePage('Dashboard')}
+                      title="Kembali ke Dashboard Utama"
+                      className="px-4 py-2 rounded-xl bg-[#e11d48] hover:bg-[#be123c] text-white text-xs font-extrabold uppercase tracking-wider shadow-sm transition active:scale-95 flex items-center gap-1.5"
+                    >
+                      <ChevronLeft size={15} /> KEMBALI
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleToggleTvFullscreen}
+                      title="Buka tampilan fullscreen di layar TV 52 inch"
+                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm transition active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Tv size={15} />
+                      <span>Mode TV 52&quot;</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenMovementForm}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-[#f4c430] hover:bg-[#eab308] px-4 py-2 text-xs font-bold text-[#17202b] shadow-sm transition active:scale-95"
+                    >
+                      <Plus size={16} /> Input Mutasi
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* View Switcher & Quick Stat Badges */}
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                <div className="inline-flex rounded-xl bg-slate-200/80 p-1 border border-slate-300">
+                <div className={`inline-flex rounded-xl p-1 border ${isTvFullscreen ? 'bg-slate-900 border-slate-700' : 'bg-slate-200/80 border-slate-300'}`}>
                   <button
                     type="button"
                     onClick={() => setStockMovementView('matrix')}
                     className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
                       stockMovementView === 'matrix'
-                        ? 'bg-white text-slate-900 shadow-sm'
+                        ? isTvFullscreen
+                          ? 'bg-amber-400 text-slate-950 shadow-sm'
+                          : 'bg-white text-slate-900 shadow-sm'
+                        : isTvFullscreen
+                        ? 'text-slate-400 hover:text-white'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <FileSpreadsheet size={14} className={stockMovementView === 'matrix' ? 'text-emerald-600' : ''} />
+                    <FileSpreadsheet size={14} className={stockMovementView === 'matrix' && !isTvFullscreen ? 'text-emerald-600' : ''} />
                     Matriks Bulanan (Tabel Harian)
                   </button>
                   <button
@@ -1077,29 +1198,33 @@ export default function Page() {
                     onClick={() => setStockMovementView('list')}
                     className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
                       stockMovementView === 'list'
-                        ? 'bg-white text-slate-900 shadow-sm'
+                        ? isTvFullscreen
+                          ? 'bg-amber-400 text-slate-950 shadow-sm'
+                          : 'bg-white text-slate-900 shadow-sm'
+                        : isTvFullscreen
+                        ? 'text-slate-400 hover:text-white'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <History size={14} className={stockMovementView === 'list' ? 'text-indigo-600' : ''} />
+                    <History size={14} className={stockMovementView === 'list' && !isTvFullscreen ? 'text-indigo-600' : ''} />
                     Log Daftar Mutasi
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                <div className={`flex items-center gap-2 text-xs font-medium ${isTvFullscreen ? 'text-slate-300' : 'text-slate-500'}`}>
                   <span>Periode Aktif:</span>
-                  <span className="font-bold text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs">
+                  <span className={`font-bold px-2.5 py-1 rounded-lg border shadow-xs ${isTvFullscreen ? 'bg-slate-900 text-amber-300 border-slate-700' : 'bg-white text-slate-800 border-slate-200'}`}>
                     📅 {monthMeta.labelIndo} ({monthMeta.daysCount} Hari)
                   </span>
                 </div>
               </div>
 
               {/* Filter Card (Matching user screenshot) */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm mb-5">
+              <div className={`rounded-2xl border p-5 shadow-sm mb-5 ${isTvFullscreen ? 'bg-slate-900/90 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'}`}>
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                   {/* BULAN */}
                   <div className="md:col-span-4 space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                    <label className={`text-[11px] font-bold uppercase tracking-wider block ${isTvFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>
                       BULAN
                     </label>
                     <div className="flex items-center gap-1.5">
@@ -1107,7 +1232,11 @@ export default function Page() {
                         type="button"
                         onClick={handlePrevMonth}
                         title="Bulan Sebelumnya"
-                        className="h-10 w-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 font-bold active:scale-95 transition"
+                        className={`h-10 w-9 rounded-xl border flex items-center justify-center font-bold active:scale-95 transition ${
+                          isTvFullscreen
+                            ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
+                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600'
+                        }`}
                       >
                         <ChevronLeft size={16} />
                       </button>
@@ -1116,14 +1245,22 @@ export default function Page() {
                           type="month"
                           value={selectedMonth}
                           onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-semibold text-xs text-slate-800 outline-none focus:border-[#f4c430]"
+                          className={`w-full h-10 rounded-xl border px-3 font-semibold text-xs outline-none ${
+                            isTvFullscreen
+                              ? 'border-slate-700 bg-slate-950 text-white focus:border-amber-400'
+                              : 'border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]'
+                          }`}
                         />
                       </div>
                       <button
                         type="button"
                         onClick={handleNextMonth}
                         title="Bulan Berikutnya"
-                        className="h-10 w-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 font-bold active:scale-95 transition"
+                        className={`h-10 w-9 rounded-xl border flex items-center justify-center font-bold active:scale-95 transition ${
+                          isTvFullscreen
+                            ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
+                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600'
+                        }`}
                       >
                         <ChevronRight size={16} />
                       </button>
@@ -1131,7 +1268,11 @@ export default function Page() {
                         type="button"
                         onClick={handleCurrentMonth}
                         title="Kembali ke Bulan Berjalan"
-                        className="h-10 px-2.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] active:scale-95 transition"
+                        className={`h-10 px-2.5 rounded-xl border font-bold text-[10px] active:scale-95 transition ${
+                          isTvFullscreen
+                            ? 'border-slate-700 bg-slate-800 hover:bg-slate-700 text-amber-300'
+                            : 'border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
                       >
                         Bulan Ini
                       </button>
@@ -1140,13 +1281,17 @@ export default function Page() {
 
                   {/* ITEM (STANDAR: SEMUA ITEM) */}
                   <div className="md:col-span-3 space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                    <label className={`text-[11px] font-bold uppercase tracking-wider block ${isTvFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>
                       ITEM (STANDAR: SEMUA ITEM)
                     </label>
                     <select
                       value={monthlyItemFilter}
                       onChange={(e) => setMonthlyItemFilter(e.target.value)}
-                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none focus:border-[#f4c430]"
+                      className={`w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none ${
+                        isTvFullscreen
+                          ? 'border-slate-700 bg-slate-950 text-white focus:border-amber-400'
+                          : 'border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]'
+                      }`}
                     >
                       <option value="ALL">SEMUA ITEM</option>
                       {parts.map((p) => (
@@ -1159,13 +1304,17 @@ export default function Page() {
 
                   {/* LINE FILTER */}
                   <div className="md:col-span-2 space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                    <label className={`text-[11px] font-bold uppercase tracking-wider block ${isTvFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>
                       LINE
                     </label>
                     <select
                       value={monthlyLineFilter}
                       onChange={(e) => setMonthlyLineFilter(e.target.value)}
-                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none focus:border-[#f4c430]"
+                      className={`w-full h-10 rounded-xl border px-3 text-xs font-semibold outline-none ${
+                        isTvFullscreen
+                          ? 'border-slate-700 bg-slate-950 text-white focus:border-amber-400'
+                          : 'border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]'
+                      }`}
                     >
                       <option value="All lines">Semua Line</option>
                       {availableLines.map((l) => (
@@ -1176,7 +1325,7 @@ export default function Page() {
                     </select>
                   </div>
 
-                  {/* EXPORT EXCEL BUTTON (Matching screenshot) */}
+                  {/* EXPORT EXCEL BUTTON */}
                   <div className="md:col-span-3 flex justify-end">
                     <button
                       type="button"
@@ -1190,19 +1339,24 @@ export default function Page() {
                 </div>
 
                 {/* Optional Quick Search bar */}
-                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                <div className={`mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-3 text-xs ${isTvFullscreen ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'}`}>
                   <div className="relative w-full sm:w-72">
                     <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                     <input
                       value={monthlySearch}
                       onChange={(e) => setMonthlySearch(e.target.value)}
                       placeholder="Cari part number, nama, spec..."
-                      className="w-full h-9 rounded-lg border border-slate-200 pl-8 pr-3 text-xs outline-none focus:border-[#f4c430]"
+                      className={`w-full h-9 rounded-lg border pl-8 pr-3 text-xs outline-none ${
+                        isTvFullscreen
+                          ? 'border-slate-700 bg-slate-950 text-white focus:border-amber-400'
+                          : 'border-slate-200 bg-white text-slate-800 focus:border-[#f4c430]'
+                      }`}
                     />
                   </div>
                   <div className="flex items-center gap-3">
                     <span>
-                      Menampilkan <strong>{filteredMonthlyParts.length}</strong> dari <strong>{parts.length}</strong> part
+                      Menampilkan <strong className={isTvFullscreen ? 'text-white' : 'text-slate-800'}>{filteredMonthlyParts.length}</strong> dari{' '}
+                      <strong className={isTvFullscreen ? 'text-white' : 'text-slate-800'}>{parts.length}</strong> part
                     </span>
                     {(monthlyItemFilter !== 'ALL' || monthlyLineFilter !== 'All lines' || monthlySearch) && (
                       <button
@@ -1212,7 +1366,7 @@ export default function Page() {
                           setMonthlyLineFilter('All lines')
                           setMonthlySearch('')
                         }}
-                        className="text-amber-600 hover:underline font-bold text-xs"
+                        className="text-amber-500 hover:underline font-bold text-xs"
                       >
                         Reset Filter
                       </button>
@@ -1223,25 +1377,27 @@ export default function Page() {
 
               {/* Monthly Summary Metric Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
+                <div className={`rounded-xl border p-3.5 shadow-xs ${isTvFullscreen ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material</p>
-                  <p className="text-lg font-bold text-slate-800 mt-0.5">{monthlyTotals.totalParts} Item</p>
+                  <p className={`text-lg sm:text-xl font-black mt-0.5 ${isTvFullscreen ? 'text-white' : 'text-slate-800'}`}>
+                    {monthlyTotals.totalParts} Item
+                  </p>
                 </div>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3.5 shadow-xs">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Total Masuk (IN)</p>
-                  <p className="text-lg font-bold text-emerald-600 mt-0.5">+{formatNumber(monthlyTotals.totalIn)} pcs</p>
+                <div className={`rounded-xl border p-3.5 shadow-xs ${isTvFullscreen ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/50 border-emerald-100'}`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isTvFullscreen ? 'text-emerald-400' : 'text-emerald-700'}`}>Total Masuk (IN)</p>
+                  <p className="text-lg sm:text-xl font-black text-emerald-500 mt-0.5">+{formatNumber(monthlyTotals.totalIn)} pcs</p>
                 </div>
-                <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-3.5 shadow-xs">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Total Keluar (OUT)</p>
-                  <p className="text-lg font-bold text-rose-600 mt-0.5">-{formatNumber(monthlyTotals.totalOut)} pcs</p>
+                <div className={`rounded-xl border p-3.5 shadow-xs ${isTvFullscreen ? 'bg-rose-950/40 border-rose-800/60' : 'bg-rose-50/50 border-rose-100'}`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isTvFullscreen ? 'text-rose-400' : 'text-rose-700'}`}>Total Keluar (OUT)</p>
+                  <p className="text-lg sm:text-xl font-black text-rose-500 mt-0.5">-{formatNumber(monthlyTotals.totalOut)} pcs</p>
                 </div>
-                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3.5 shadow-xs">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Saldo Akhir Bulan</p>
-                  <p className="text-lg font-bold text-blue-600 mt-0.5">{formatNumber(monthlyTotals.totalFinalStock)} pcs</p>
+                <div className={`rounded-xl border p-3.5 shadow-xs ${isTvFullscreen ? 'bg-blue-950/40 border-blue-800/60' : 'bg-blue-50/50 border-blue-100'}`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isTvFullscreen ? 'text-blue-400' : 'text-blue-700'}`}>Saldo Akhir Bulan</p>
+                  <p className="text-lg sm:text-xl font-black text-blue-400 mt-0.5">{formatNumber(monthlyTotals.totalFinalStock)} pcs</p>
                 </div>
               </div>
 
-              {/* Hint Scroll Banner (Exact from user screenshot) */}
+              {/* Hint Scroll Banner */}
               <div className="bg-[#e0f7fa] border border-[#80deea] text-[#006064] px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs mb-4">
                 <ArrowLeftRight size={16} className="text-[#00838f] shrink-0" />
                 <span>
@@ -1251,15 +1407,15 @@ export default function Page() {
 
               {/* Main Content Area */}
               {stockMovementView === 'matrix' ? (
-                /* ── MONTHLY MATRIX TABLE ── */
-                <div className="rounded-2xl border border-slate-300 bg-white shadow-md overflow-hidden">
+                /* ── MONTHLY MATRIX TABLE (IN / OUT / SISA only, AWAL is in front) ── */
+                <div className={`rounded-2xl border shadow-md overflow-hidden ${isTvFullscreen ? 'border-slate-700 bg-slate-950' : 'border-slate-300 bg-white'}`}>
                   <div className="overflow-x-auto relative">
                     <table className="w-full text-left border-collapse text-xs">
                       {/* Dark table header */}
                       <thead>
                         <tr className="bg-[#17202b] text-white border-b border-slate-700 text-[11px] font-bold">
                           {/* Sticky Item / Data Header */}
-                          <th className="sticky left-0 z-30 bg-[#17202b] px-4 py-3.5 min-w-[200px] sm:min-w-[220px] border-r border-slate-700 shadow-[2px_0_6px_rgba(0,0,0,0.25)]">
+                          <th className="sticky left-0 z-30 bg-[#17202b] px-4 py-3.5 min-w-[210px] sm:min-w-[230px] border-r border-slate-700 shadow-[2px_0_6px_rgba(0,0,0,0.25)]">
                             <span className="tracking-wider uppercase text-slate-200">ITEM / DATA</span>
                           </th>
 
@@ -1275,13 +1431,13 @@ export default function Page() {
                                 key={dayNum}
                                 className={`px-2 py-3 text-center min-w-[58px] border-r border-slate-700/60 transition ${
                                   isToday
-                                    ? 'bg-amber-500/20 text-[#f4c430] border-t-2 border-t-[#f4c430]'
+                                    ? 'bg-amber-500/25 text-[#f4c430] border-t-2 border-t-[#f4c430]'
                                     : isWeekend
                                     ? 'bg-slate-800/60 text-slate-400'
                                     : 'text-slate-200'
                                 }`}
                               >
-                                <div className="text-[12px] font-bold font-mono">
+                                <div className={`font-mono ${isTvFullscreen ? 'text-[13px] font-black' : 'text-[12px] font-bold'}`}>
                                   {String(dayNum).padStart(2, '0')}
                                 </div>
                                 <div className="text-[9px] font-normal text-slate-400 lowercase">
@@ -1329,148 +1485,160 @@ export default function Page() {
                             </td>
                           </tr>
                         ) : (
-                          monthlyMatrixData.map((item) => (
-                            <React.Fragment key={item.part.id}>
-                              {/* ── Item Banner Row (Matching screenshot's red bar item header) ── */}
-                              <tr className="bg-slate-200/90 border-t-2 border-slate-300">
-                                <td className="sticky left-0 z-20 bg-slate-200 px-4 py-2.5 font-bold border-r border-slate-300 shadow-[2px_0_6px_rgba(0,0,0,0.06)]">
-                                  <div className="flex items-center gap-2">
-                                    <span className="px-2.5 py-0.5 rounded bg-[#e11d48] text-white font-mono font-extrabold text-xs shadow-xs tracking-wide">
-                                      {item.part.id}
-                                    </span>
-                                    <span className="font-extrabold text-slate-900 text-xs truncate max-w-[130px]" title={item.part.part}>
-                                      {item.part.part}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td
-                                  colSpan={monthMeta.daysCount + 3}
-                                  className="px-4 py-2 text-[11px] font-semibold text-slate-700 bg-slate-200/90"
-                                >
-                                  <div className="flex flex-wrap items-center gap-3">
-                                    <span className="px-2 py-0.5 rounded bg-white text-slate-800 font-bold border border-slate-300 text-[10px]">
-                                      Line {item.part.line}
-                                    </span>
-                                    <span>
-                                      Coil: <strong className="text-slate-900">{item.part.coil}</strong>
-                                    </span>
-                                    <span>&middot;</span>
-                                    <span>
-                                      Spec: <strong className="text-slate-900">{item.part.spec}</strong>
-                                    </span>
-                                    <span>&middot;</span>
-                                    <span>
-                                      Stok Awal Master: <strong className="text-slate-900">{formatNumber(item.part.opening)} pcs</strong>
-                                    </span>
-                                  </div>
-                                </td>
-                              </tr>
+                          monthlyMatrixData.map((item) => {
+                            const liveCurrent = partStats[item.part.id]?.currentStock ?? item.part.opening
+                            const isMinus = liveCurrent < 0
 
-                              {/* ── Sub-row 1: AWAL ── */}
-                              <tr className="hover:bg-slate-50/70 transition-colors">
-                                <td className="sticky left-0 z-20 bg-white px-4 py-2 text-center font-bold text-[11px] text-slate-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
-                                  AWAL
-                                </td>
-                                {item.daily.map((d) => (
-                                  <td
-                                    key={d.dayNum}
-                                    className={`px-2 py-2 text-center font-mono font-semibold text-xs border-r border-slate-100 ${
-                                      d.isToday ? 'bg-amber-50/40 text-slate-800 font-bold' : 'text-slate-700'
-                                    }`}
-                                  >
-                                    {formatNumber(d.awal)}
+                            return (
+                              <React.Fragment key={item.part.id}>
+                                {/* ── Item Banner Row: FRONT INFORMATION with Opening Stock & Real-time Live Stock ── */}
+                                <tr className="bg-slate-200/95 border-t-2 border-slate-300">
+                                  <td className="sticky left-0 z-20 bg-slate-200 px-4 py-2.5 font-bold border-r border-slate-300 shadow-[2px_0_6px_rgba(0,0,0,0.06)]">
+                                    <div className="flex items-center gap-2">
+                                      <span className="px-2.5 py-0.5 rounded bg-[#e11d48] text-white font-mono font-extrabold text-xs shadow-xs tracking-wide">
+                                        {item.part.id}
+                                      </span>
+                                      <span className="font-extrabold text-slate-900 text-xs truncate max-w-[130px]" title={item.part.part}>
+                                        {item.part.part}
+                                      </span>
+                                    </div>
                                   </td>
-                                ))}
-                                <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-slate-50 text-slate-700" colSpan={3}>
-                                  {formatNumber(item.daily[0]?.awal ?? item.priorStock)}
-                                </td>
-                              </tr>
+                                  <td
+                                    colSpan={monthMeta.daysCount + 3}
+                                    className="px-4 py-2 text-[11px] font-semibold text-slate-700 bg-slate-200/90"
+                                  >
+                                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                      {/* Line badge */}
+                                      <span className="px-2 py-0.5 rounded bg-white text-slate-800 font-bold border border-slate-300 text-[10px]">
+                                        Line {item.part.line}
+                                      </span>
 
-                              {/* ── Sub-row 2: IN ── */}
-                              <tr className="hover:bg-slate-50/70 transition-colors bg-emerald-50/15">
-                                <td className="sticky left-0 z-20 bg-emerald-50/80 px-4 py-2 text-center font-extrabold text-[11px] text-emerald-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
-                                  IN
-                                </td>
-                                {item.daily.map((d) => (
-                                  <td
-                                    key={d.dayNum}
-                                    className={`px-2 py-2 text-center font-mono text-xs border-r border-slate-100 ${
-                                      d.inQty > 0
-                                        ? 'font-bold text-emerald-700 bg-emerald-100/50'
-                                        : 'text-slate-400'
-                                    } ${d.isToday ? 'border-amber-300' : ''}`}
-                                  >
-                                    {d.inQty > 0 ? formatNumber(d.inQty) : 0}
-                                  </td>
-                                ))}
-                                <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-emerald-50 text-emerald-700">
-                                  +{formatNumber(item.totalIn)}
-                                </td>
-                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
-                                  —
-                                </td>
-                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
-                                  —
-                                </td>
-                              </tr>
+                                      {/* 📦 STOK AWAL BULAN (Pindah ke depan) */}
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-white border border-slate-300 text-slate-800 font-bold shadow-2xs">
+                                        <span className="text-slate-500 font-normal">Stok Awal:</span>
+                                        <strong className="text-slate-900 font-mono">{formatNumber(item.daily[0]?.awal ?? item.priorStock)}</strong>
+                                        <span className="text-[10px] text-slate-400">pcs</span>
+                                      </span>
 
-                              {/* ── Sub-row 3: OUT ── */}
-                              <tr className="hover:bg-slate-50/70 transition-colors bg-rose-50/15">
-                                <td className="sticky left-0 z-20 bg-rose-50/80 px-4 py-2 text-center font-extrabold text-[11px] text-rose-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
-                                  OUT
-                                </td>
-                                {item.daily.map((d) => (
-                                  <td
-                                    key={d.dayNum}
-                                    className={`px-2 py-2 text-center font-mono text-xs border-r border-slate-100 ${
-                                      d.outQty > 0
-                                        ? 'font-bold text-rose-700 bg-rose-100/50'
-                                        : 'text-slate-400'
-                                    } ${d.isToday ? 'border-amber-300' : ''}`}
-                                  >
-                                    {d.outQty > 0 ? formatNumber(d.outQty) : 0}
-                                  </td>
-                                ))}
-                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
-                                  —
-                                </td>
-                                <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-rose-50 text-rose-700">
-                                  -{formatNumber(item.totalOut)}
-                                </td>
-                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
-                                  —
-                                </td>
-                              </tr>
+                                      {/* 📥 TOTAL IN BULAN INI */}
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100/90 border border-emerald-300 text-emerald-800 font-bold">
+                                        <span className="text-emerald-700/80 font-normal text-[10px]">In:</span>
+                                        <strong className="font-mono">+{formatNumber(item.totalIn)}</strong>
+                                      </span>
 
-                              {/* ── Sub-row 4: SISA (BOLD BLUE AS IN SCREENSHOT) ── */}
-                              <tr className="hover:bg-blue-50/30 transition-colors bg-blue-50/10 border-b-2 border-slate-300">
-                                <td className="sticky left-0 z-20 bg-blue-50/90 px-4 py-2 text-center font-extrabold text-[11px] text-[#2563eb] uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
-                                  SISA
-                                </td>
-                                {item.daily.map((d) => (
-                                  <td
-                                    key={d.dayNum}
-                                    className={`px-2 py-2 text-center font-mono font-bold text-xs border-r border-slate-100 ${
-                                      d.sisa < 0
-                                        ? 'text-rose-600 bg-rose-100'
-                                        : 'text-[#2563eb]'
-                                    } ${d.isToday ? 'bg-amber-50/60' : ''}`}
-                                  >
-                                    {formatNumber(d.sisa)}
+                                      {/* 📤 TOTAL OUT BULAN INI */}
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-100/90 border border-rose-300 text-rose-800 font-bold">
+                                        <span className="text-rose-700/80 font-normal text-[10px]">Out:</span>
+                                        <strong className="font-mono">-{formatNumber(item.totalOut)}</strong>
+                                      </span>
+
+                                      {/* ⚡ STOK TERKINI (LIVE UPDATE REALTIME) */}
+                                      <span
+                                        className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-lg border font-extrabold shadow-xs transition-all ${
+                                          isMinus
+                                            ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
+                                            : 'bg-blue-600 text-white border-blue-700'
+                                        }`}
+                                        title="Stok saat ini (otomatis update seketika ada mutasi masuk/keluar)"
+                                      >
+                                        <span className="text-[10px] uppercase font-bold tracking-wider opacity-90">⚡ Stok Terkini:</span>
+                                        <span className="font-mono text-xs">{formatNumber(liveCurrent)} pcs</span>
+                                      </span>
+
+                                      <span className="hidden lg:inline text-slate-400">&middot;</span>
+                                      <span className="hidden lg:inline text-slate-600">
+                                        Coil: <strong className="text-slate-800">{item.part.coil}</strong> &middot; Spec: <strong className="text-slate-800">{item.part.spec}</strong>
+                                      </span>
+                                    </div>
                                   </td>
-                                ))}
-                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
-                                  —
-                                </td>
-                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
-                                  —
-                                </td>
-                                <td className={`px-3 py-2 text-right font-mono font-extrabold text-xs border-l border-slate-200 ${item.finalSisa < 0 ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
-                                  {formatNumber(item.finalSisa)}
-                                </td>
-                              </tr>
-                            </React.Fragment>
-                          ))
+                                </tr>
+
+                                {/* ── Sub-row 1: IN (Barang Masuk) ── */}
+                                <tr className="hover:bg-slate-50/70 transition-colors bg-emerald-50/15">
+                                  <td className="sticky left-0 z-20 bg-emerald-50/80 px-4 py-2 text-center font-extrabold text-[11px] text-emerald-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                    IN
+                                  </td>
+                                  {item.daily.map((d) => (
+                                    <td
+                                      key={d.dayNum}
+                                      className={`px-2 py-2 text-center font-mono text-xs border-r border-slate-100 ${
+                                        d.inQty > 0
+                                          ? 'font-bold text-emerald-700 bg-emerald-100/50'
+                                          : 'text-slate-400'
+                                      } ${d.isToday ? 'border-amber-300' : ''}`}
+                                    >
+                                      {d.inQty > 0 ? formatNumber(d.inQty) : 0}
+                                    </td>
+                                  ))}
+                                  <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-emerald-50 text-emerald-700">
+                                    +{formatNumber(item.totalIn)}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                    —
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                    —
+                                  </td>
+                                </tr>
+
+                                {/* ── Sub-row 2: OUT (Barang Keluar) ── */}
+                                <tr className="hover:bg-slate-50/70 transition-colors bg-rose-50/15">
+                                  <td className="sticky left-0 z-20 bg-rose-50/80 px-4 py-2 text-center font-extrabold text-[11px] text-rose-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                    OUT
+                                  </td>
+                                  {item.daily.map((d) => (
+                                    <td
+                                      key={d.dayNum}
+                                      className={`px-2 py-2 text-center font-mono text-xs border-r border-slate-100 ${
+                                        d.outQty > 0
+                                          ? 'font-bold text-rose-700 bg-rose-100/50'
+                                          : 'text-slate-400'
+                                      } ${d.isToday ? 'border-amber-300' : ''}`}
+                                    >
+                                      {d.outQty > 0 ? formatNumber(d.outQty) : 0}
+                                    </td>
+                                  ))}
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                    —
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-rose-50 text-rose-700">
+                                    -{formatNumber(item.totalOut)}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                    —
+                                  </td>
+                                </tr>
+
+                                {/* ── Sub-row 3: SISA (BOLD BLUE AS IN SCREENSHOT) ── */}
+                                <tr className="hover:bg-blue-50/30 transition-colors bg-blue-50/10 border-b-2 border-slate-300">
+                                  <td className="sticky left-0 z-20 bg-blue-50/90 px-4 py-2 text-center font-extrabold text-[11px] text-[#2563eb] uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                    SISA
+                                  </td>
+                                  {item.daily.map((d) => (
+                                    <td
+                                      key={d.dayNum}
+                                      className={`px-2 py-2 text-center font-mono font-bold text-xs border-r border-slate-100 ${
+                                        d.sisa < 0
+                                          ? 'text-rose-600 bg-rose-100'
+                                          : 'text-[#2563eb]'
+                                      } ${d.isToday ? 'bg-amber-50/60' : ''}`}
+                                    >
+                                      {formatNumber(d.sisa)}
+                                    </td>
+                                  ))}
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                    —
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                    —
+                                  </td>
+                                  <td className={`px-3 py-2 text-right font-mono font-extrabold text-xs border-l border-slate-200 ${item.finalSisa < 0 ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
+                                    {formatNumber(item.finalSisa)}
+                                  </td>
+                                </tr>
+                              </React.Fragment>
+                            )
+                          })
                         )}
                       </tbody>
                     </table>
@@ -1524,7 +1692,7 @@ export default function Page() {
                   />
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* MASTER PART PAGE */}
