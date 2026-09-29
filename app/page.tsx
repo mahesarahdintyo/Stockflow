@@ -105,6 +105,13 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value)
 }
 
+function getCurrentTime() {
+  const now = new Date()
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
 export default function Page() {
   const [activePage, setActivePage] = useState('Dashboard')
   
@@ -146,6 +153,7 @@ export default function Page() {
   const [selectedPartId, setSelectedPartId] = useState('')
   const [movQty, setMovQty] = useState('100')
   const [movDate, setMovDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [movTime, setMovTime] = useState(getCurrentTime)
   const [movNote, setMovNote] = useState('')
 
   // Part Form fields
@@ -272,15 +280,16 @@ export default function Page() {
   // Riwayat filtered movements
   const riwayatFiltered = useMemo(() => {
     return movements.filter((m) => {
-      const inDateRange = m.date >= riwayatFromDate && m.date <= riwayatToDate
+      const mDateOnly = m.date.slice(0, 10)
+      const inDateRange = (!riwayatFromDate || mDateOnly >= riwayatFromDate) && (!riwayatToDate || mDateOnly <= riwayatToDate)
       const matchesPart = riwayatPartFilter === 'ALL' || m.partId === riwayatPartFilter
       const matchesType = riwayatTypeFilter === 'ALL' || m.type === riwayatTypeFilter
       const part = parts.find((p) => p.id === m.partId)
-      const searchTarget = `${m.partId} ${part?.part || ''} ${m.note} ${m.id}`.toLowerCase()
+      const searchTarget = `${m.partId} ${part?.part || ''} ${m.note} ${m.id} ${m.date}`.toLowerCase()
       const matchesSearch = !riwayatSearch || searchTarget.includes(riwayatSearch.toLowerCase())
       return inDateRange && matchesPart && matchesType && matchesSearch
     }).sort((a, b) => {
-      // Sort by date desc, then by id desc
+      // Sort by datetime desc, then by id desc
       if (b.date !== a.date) return b.date.localeCompare(a.date)
       return b.id.localeCompare(a.id)
     })
@@ -362,6 +371,9 @@ export default function Page() {
     } else if (currentRole === 'PRODUCTION') {
       setMovType('OUT')
     }
+    setMovDate(new Date().toISOString().split('T')[0])
+    setMovTime(getCurrentTime())
+    setMovQty('100')
     setMovNote('')
     setShowMovementForm(true)
   }
@@ -382,10 +394,14 @@ export default function Page() {
       return
     }
 
+    const datePart = movDate || new Date().toISOString().split('T')[0]
+    const timePart = movTime || getCurrentTime()
+    const fullDate = `${datePart} ${timePart}`
+
     const newMov: MovementItem = {
       id: `TRX-${String(movements.length + 1).padStart(4, '0')}`,
       partId: selectedPartId,
-      date: movDate || new Date().toISOString().split('T')[0],
+      date: fullDate,
       type: movType,
       qty,
       note: movNote.trim() || '-',
@@ -985,6 +1001,76 @@ export default function Page() {
               <div className="rounded-2xl overflow-hidden" style={{ background: '#202932', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}>
                 {/* Filter Bar */}
                 <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+                  {/* Tablet Quick Range Chips */}
+                  <div className="mb-3.5 flex flex-wrap items-center gap-1.5 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span className="text-[10px] font-bold uppercase tracking-widest mr-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                      Rentang Cepat:
+                    </span>
+                    {[
+                      {
+                        label: 'Hari Ini',
+                        getDates: () => {
+                          const today = new Date().toISOString().split('T')[0]
+                          return { from: today, to: today }
+                        },
+                      },
+                      {
+                        label: 'Kemarin',
+                        getDates: () => {
+                          const d = new Date()
+                          d.setDate(d.getDate() - 1)
+                          const yest = d.toISOString().split('T')[0]
+                          return { from: yest, to: yest }
+                        },
+                      },
+                      {
+                        label: '7 Hari Terakhir',
+                        getDates: () => {
+                          const to = new Date().toISOString().split('T')[0]
+                          const d = new Date()
+                          d.setDate(d.getDate() - 7)
+                          const from = d.toISOString().split('T')[0]
+                          return { from, to }
+                        },
+                      },
+                      {
+                        label: 'Bulan Ini',
+                        getDates: () => {
+                          const to = new Date().toISOString().split('T')[0]
+                          const d = new Date()
+                          d.setDate(1)
+                          const from = d.toISOString().split('T')[0]
+                          return { from, to }
+                        },
+                      },
+                      {
+                        label: 'Semua Data',
+                        getDates: () => ({ from: '', to: '' }),
+                      },
+                    ].map((preset) => {
+                      const dates = preset.getDates()
+                      const isActive = riwayatFromDate === dates.from && riwayatToDate === dates.to
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            setRiwayatFromDate(dates.from)
+                            setRiwayatToDate(dates.to)
+                            setRiwayatPage(1)
+                          }}
+                          className={`text-xs px-3 py-1.5 rounded-xl font-bold transition active:scale-95 ${
+                            isActive
+                              ? 'bg-[#f4c430] text-[#202932] shadow-sm'
+                              : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+
                   <div className="flex flex-wrap items-end gap-3">
                     {/* Dari Tanggal */}
                     <div className="flex flex-col gap-1.5">
@@ -1206,6 +1292,25 @@ export default function Page() {
         </div>
       </main>
 
+      {/* FLOATING ACTION BUTTON (FAB) - Mempermudah Input di Tablet & Mobile */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          onClick={handleOpenMovementForm}
+          title="Input Pergerakan Cepat"
+          className="flex items-center gap-2.5 rounded-2xl px-4 py-3.5 text-xs sm:text-sm font-bold shadow-2xl hover:scale-105 active:scale-95 transition-all duration-150 border border-amber-300/40"
+          style={{
+            background: 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)',
+            color: '#202932',
+            boxShadow: '0 10px 25px -4px rgba(244, 196, 48, 0.45), 0 6px 12px -3px rgba(0, 0, 0, 0.25)',
+          }}
+        >
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#202932] text-white">
+            <Plus size={15} className="stroke-[3]" />
+          </div>
+          <span className="font-extrabold tracking-wide">Input Mutasi</span>
+        </button>
+      </div>
+
       {/* MODAL INPUT PERGERAKAN (IN / OUT) */}
       {showMovementForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17202b]/60 backdrop-blur-xs p-4">
@@ -1256,26 +1361,153 @@ export default function Page() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Tanggal & Jam Transaksi dengan Quick Stepper, Jam, & Presets */}
                 <div>
-                  <label className="block mb-1.5 text-xs font-bold text-slate-600">Tanggal Transaksi</label>
-                  <input
-                    type="date"
-                    value={movDate}
-                    onChange={(e) => setMovDate(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#eab308]"
-                  />
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-600">Tanggal & Jam</label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const base = movDate ? new Date(movDate) : new Date()
+                          base.setDate(base.getDate() - 1)
+                          setMovDate(base.toISOString().split('T')[0])
+                        }}
+                        title="Hari sebelumnya"
+                        className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 text-[11px] font-bold active:scale-95 transition"
+                      >
+                        ◀ -1H
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const base = movDate ? new Date(movDate) : new Date()
+                          base.setDate(base.getDate() + 1)
+                          setMovDate(base.toISOString().split('T')[0])
+                        }}
+                        title="Hari berikutnya"
+                        className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 text-[11px] font-bold active:scale-95 transition"
+                      >
+                        +1H ▶
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={movDate}
+                      onChange={(e) => setMovDate(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#eab308]"
+                    />
+                    <input
+                      type="time"
+                      value={movTime}
+                      onChange={(e) => setMovTime(e.target.value)}
+                      className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-[#eab308]"
+                    />
+                  </div>
+                  {/* Quick Preset Buttons Tablet */}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMovDate(new Date().toISOString().split('T')[0])
+                        setMovTime(getCurrentTime())
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition active:scale-95 ${
+                        movDate === new Date().toISOString().split('T')[0]
+                          ? 'bg-[#202932] text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Hari Ini
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date()
+                        d.setDate(d.getDate() - 1)
+                        setMovDate(d.toISOString().split('T')[0])
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition active:scale-95 ${
+                        (() => {
+                          const d = new Date()
+                          d.setDate(d.getDate() - 1)
+                          return movDate === d.toISOString().split('T')[0]
+                        })()
+                          ? 'bg-[#202932] text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Kemarin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMovTime(getCurrentTime())}
+                      className="px-2 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 active:scale-95 transition flex items-center gap-1"
+                    >
+                      <Clock size={11} /> Jam Sekarang
+                    </button>
+                  </div>
                 </div>
+
+                {/* Jumlah (Qty) dengan Touch Stepper & Quick Chips */}
                 <div>
-                  <label className="block mb-1.5 text-xs font-bold text-slate-600">Jumlah (Qty)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={movQty}
-                    onChange={(e) => setMovQty(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#eab308]"
-                    placeholder="Contoh: 100"
-                  />
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-600">Jumlah (Qty)</label>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {formatNumber(Number(movQty) || 0)} pcs
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setMovQty((prev) => String(Math.max(1, (Number(prev) || 0) - 10)))}
+                      className="h-10 w-11 shrink-0 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 active:scale-95 transition flex items-center justify-center text-xs"
+                    >
+                      -10
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      value={movQty}
+                      onChange={(e) => setMovQty(e.target.value)}
+                      className="w-full text-center font-bold text-sm rounded-lg border border-slate-200 px-2 py-2 outline-none focus:border-[#eab308]"
+                      placeholder="100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMovQty((prev) => String((Number(prev) || 0) + 10))}
+                      className="h-10 w-11 shrink-0 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 active:scale-95 transition flex items-center justify-center text-xs"
+                    >
+                      +10
+                    </button>
+                  </div>
+                  {/* Quick Qty Preset Chips */}
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {[50, 100, 250, 500].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setMovQty(String(preset))}
+                        className={`px-2 py-1 rounded-md text-[11px] font-bold transition active:scale-95 ${
+                          Number(movQty) === preset
+                            ? 'bg-[#f4c430] text-[#202932] shadow-xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setMovQty((prev) => String((Number(prev) || 0) + 100))}
+                      className="px-2 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 active:scale-95 transition"
+                    >
+                      +100
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1331,15 +1563,79 @@ export default function Page() {
                 )}
               </div>
 
+              {/* Keterangan / Catatan dengan Preset Chips untuk Tablet */}
               <div>
-                <label className="block mb-1.5 text-xs font-bold text-slate-600">Keterangan / Catatan</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-600">Keterangan / Catatan</label>
+                  <span className="text-[10px] text-slate-400">Tap pilihan di bawah atau ketik manual</span>
+                </div>
                 <input
                   type="text"
                   value={movNote}
                   onChange={(e) => setMovNote(e.target.value)}
-                  placeholder="Contoh: Pemakaian Line YHA / Input dari Supplier"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#eab308]"
+                  placeholder="Pilih tombol di bawah atau ketik..."
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#eab308]"
                 />
+                {/* Quick Note Chips */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {movType === 'IN' ? (
+                    <>
+                      {[
+                        'Input dari Supplier',
+                        'Bongkar Kontainer',
+                        'Retur Produksi',
+                        'Koreksi Stok Fisik',
+                        'Kedatangan Material Baru',
+                      ].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setMovNote(preset)}
+                          className={`text-[11px] px-2.5 py-1 rounded-lg border transition active:scale-95 ${
+                            movNote === preset
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold shadow-xs'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      {[
+                        'Pemakaian Line YHA',
+                        'Pemakaian Line YHB',
+                        'Supply Setting Dies',
+                        'Scrap / Part Defect',
+                        'Trial Line Produksi',
+                        'Sample Quality Control',
+                      ].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setMovNote(preset)}
+                          className={`text-[11px] px-2.5 py-1 rounded-lg border transition active:scale-95 ${
+                            movNote === preset
+                              ? 'bg-rose-50 text-rose-800 border-rose-300 font-bold shadow-xs'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {movNote && (
+                    <button
+                      type="button"
+                      onClick={() => setMovNote('')}
+                      className="text-[11px] px-2 py-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    >
+                      ✕ Clear
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Live Preview Balance */}
@@ -1603,7 +1899,15 @@ function MovementTable({
                   <p className="font-bold text-slate-800">{m.partId}</p>
                   <p className="mt-0.5 text-[10px] text-slate-400">{partInfo?.part || 'Part'}</p>
                 </td>
-                <td className="whitespace-nowrap px-3 py-4 text-slate-500">{m.date}</td>
+                <td className="whitespace-nowrap px-3 py-4 text-slate-500">
+                  <p className="font-semibold text-slate-700">{m.date.split(' ')[0]}</p>
+                  {m.date.split(' ')[1] && (
+                    <p className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                      <Clock size={10} />
+                      {m.date.split(' ')[1]}
+                    </p>
+                  )}
+                </td>
                 <td className="px-3 py-4 text-slate-500 max-w-[180px] truncate">{m.note}</td>
                 <td className="px-3 py-4">
                   <span
@@ -1783,8 +2087,13 @@ function RiwayatTable({
                     />
                     <div>
                       <div className="flex items-center gap-1.5 text-slate-200 font-semibold text-xs">
-                        <Clock size={12} className="text-slate-400" />
-                        <span>{m.date}</span>
+                        <Clock size={12} className="text-[#f4c430]/80" />
+                        <span>{m.date.split(' ')[0]}</span>
+                        {m.date.split(' ')[1] && (
+                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-semibold border border-white/5">
+                            {m.date.split(' ')[1]}
+                          </span>
+                        )}
                       </div>
                       <p className="text-[10px] text-slate-400 mt-0.5 max-w-[150px] truncate">
                         {m.note || m.id}
