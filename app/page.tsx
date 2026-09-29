@@ -105,11 +105,56 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value)
 }
 
-function getCurrentTime() {
-  const now = new Date()
-  const hh = String(now.getHours()).padStart(2, '0')
-  const mm = String(now.getMinutes()).padStart(2, '0')
-  return `${hh}:${mm}`
+/** PKIS-PLUS Date & Time Helper Functions */
+function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getLocalTimeString(d: Date = new Date()): string {
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+function parseDateTimeString(dtStr?: string): { date: string; time: string } {
+  if (!dtStr) {
+    return { date: getLocalDateString(), time: getLocalTimeString() }
+  }
+  if (dtStr.includes('T')) {
+    const [d, t] = dtStr.split('T')
+    return { date: d || getLocalDateString(), time: (t || '').slice(0, 5) }
+  }
+  if (dtStr.includes(' ')) {
+    const [d, t] = dtStr.split(' ')
+    return { date: d || getLocalDateString(), time: (t || '').slice(0, 5) }
+  }
+  return { date: dtStr.slice(0, 10), time: dtStr.length > 10 ? dtStr.slice(11, 16) : '' }
+}
+
+function fmt(iso?: string | null): string {
+  if (!iso) return '-'
+  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'))
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function fmtClock(iso?: string | null): string {
+  if (!iso) return '-'
+  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'))
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export default function Page() {
@@ -139,21 +184,21 @@ export default function Page() {
   const [riwayatFromDate, setRiwayatFromDate] = useState(() => {
     const d = new Date()
     d.setDate(1)
-    return d.toISOString().split('T')[0]
+    return getLocalDateString(d)
   })
-  const [riwayatToDate, setRiwayatToDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [riwayatToDate, setRiwayatToDate] = useState(() => getLocalDateString())
   const [riwayatPartFilter, setRiwayatPartFilter] = useState('ALL')
   const [riwayatTypeFilter, setRiwayatTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL')
   const [riwayatSearch, setRiwayatSearch] = useState('')
   const [riwayatPage, setRiwayatPage] = useState(1)
   const RIWAYAT_PAGE_SIZE = 20
 
-  // Movement Form fields
+  // Movement Form fields (PKIS-PLUS standard)
   const [movType, setMovType] = useState<'IN' | 'OUT'>('IN')
   const [selectedPartId, setSelectedPartId] = useState('')
   const [movQty, setMovQty] = useState('100')
-  const [movDate, setMovDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [movTime, setMovTime] = useState(getCurrentTime)
+  const [movDate, setMovDate] = useState(() => getLocalDateString())
+  const [movTime, setMovTime] = useState(() => getLocalTimeString())
   const [movNote, setMovNote] = useState('')
 
   // Part Form fields
@@ -308,8 +353,8 @@ export default function Page() {
   function handleRiwayatReset() {
     const d = new Date()
     d.setDate(1)
-    setRiwayatFromDate(d.toISOString().split('T')[0])
-    setRiwayatToDate(new Date().toISOString().split('T')[0])
+    setRiwayatFromDate(getLocalDateString(d))
+    setRiwayatToDate(getLocalDateString())
     setRiwayatPartFilter('ALL')
     setRiwayatTypeFilter('ALL')
     setRiwayatSearch('')
@@ -371,8 +416,8 @@ export default function Page() {
     } else if (currentRole === 'PRODUCTION') {
       setMovType('OUT')
     }
-    setMovDate(new Date().toISOString().split('T')[0])
-    setMovTime(getCurrentTime())
+    setMovDate(getLocalDateString())
+    setMovTime(getLocalTimeString())
     setMovQty('100')
     setMovNote('')
     setShowMovementForm(true)
@@ -394,9 +439,10 @@ export default function Page() {
       return
     }
 
-    const datePart = movDate || new Date().toISOString().split('T')[0]
-    const timePart = movTime || getCurrentTime()
-    const fullDate = `${datePart} ${timePart}`
+    const datePart = movDate || getLocalDateString()
+    const timePart = movTime || getLocalTimeString()
+    // Format ISO 8601 standard PKIS-PLUS
+    const fullDate = `${datePart}T${timePart}`
 
     const newMov: MovementItem = {
       id: `TRX-${String(movements.length + 1).padStart(4, '0')}`,
@@ -1362,93 +1408,103 @@ export default function Page() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {/* Tanggal & Jam Transaksi dengan Quick Stepper, Jam, & Presets */}
+                {/* Tanggal & Waktu Transaksi (Sistem Standar PKIS-PLUS) */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-slate-600">Tanggal & Jam</label>
+                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                      <Calendar size={13} className="text-indigo-500" /> Tanggal & Waktu
+                    </label>
                     <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setMovDate(getLocalDateString())}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer active:scale-95 transition ${
+                          movDate === getLocalDateString()
+                            ? 'text-blue-600 bg-blue-500/15 border border-blue-400/30'
+                            : 'text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200'
+                        }`}
+                      >
+                        Hari Ini
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = new Date()
+                          target.setDate(target.getDate() - 1)
+                          setMovDate(getLocalDateString(target))
+                        }}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer active:scale-95 transition ${
+                          (() => {
+                            const d = new Date()
+                            d.setDate(d.getDate() - 1)
+                            return movDate === getLocalDateString(d)
+                          })()
+                            ? 'text-blue-600 bg-blue-500/15 border border-blue-400/30'
+                            : 'text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200'
+                        }`}
+                      >
+                        Kemarin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date()
+                          setMovDate(getLocalDateString(now))
+                          setMovTime(getLocalTimeString(now))
+                        }}
+                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-500/15 hover:bg-emerald-500/25 px-2 py-0.5 rounded cursor-pointer active:scale-95 transition flex items-center gap-0.5"
+                      >
+                        ⚡ Sekarang
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={movDate}
+                      onChange={(e) => setMovDate(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono font-semibold bg-white outline-none focus:border-[#eab308]"
+                    />
+                    <input
+                      type="time"
+                      value={movTime}
+                      onChange={(e) => setMovTime(e.target.value)}
+                      className="w-28 h-9 rounded-lg border border-slate-200 px-2 py-2 text-xs font-mono font-semibold bg-white outline-none focus:border-[#eab308]"
+                    />
+                  </div>
+
+                  {/* Stepper Cepat Hari & Live Timestamp Display */}
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                    <div className="flex gap-1">
                       <button
                         type="button"
                         onClick={() => {
                           const base = movDate ? new Date(movDate) : new Date()
                           base.setDate(base.getDate() - 1)
-                          setMovDate(base.toISOString().split('T')[0])
+                          setMovDate(getLocalDateString(base))
                         }}
-                        title="Hari sebelumnya"
-                        className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 text-[11px] font-bold active:scale-95 transition"
+                        title="Mundur 1 Hari"
+                        className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold active:scale-95 transition"
                       >
-                        ◀ -1H
+                        ◀ -1 Hari
                       </button>
                       <button
                         type="button"
                         onClick={() => {
                           const base = movDate ? new Date(movDate) : new Date()
                           base.setDate(base.getDate() + 1)
-                          setMovDate(base.toISOString().split('T')[0])
+                          setMovDate(getLocalDateString(base))
                         }}
-                        title="Hari berikutnya"
-                        className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 text-[11px] font-bold active:scale-95 transition"
+                        title="Maju 1 Hari"
+                        className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold active:scale-95 transition"
                       >
-                        +1H ▶
+                        +1 Hari ▶
                       </button>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={movDate}
-                      onChange={(e) => setMovDate(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#eab308]"
-                    />
-                    <input
-                      type="time"
-                      value={movTime}
-                      onChange={(e) => setMovTime(e.target.value)}
-                      className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-[#eab308]"
-                    />
-                  </div>
-                  {/* Quick Preset Buttons Tablet */}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMovDate(new Date().toISOString().split('T')[0])
-                        setMovTime(getCurrentTime())
-                      }}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition active:scale-95 ${
-                        movDate === new Date().toISOString().split('T')[0]
-                          ? 'bg-[#202932] text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      Hari Ini
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const d = new Date()
-                        d.setDate(d.getDate() - 1)
-                        setMovDate(d.toISOString().split('T')[0])
-                      }}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition active:scale-95 ${
-                        (() => {
-                          const d = new Date()
-                          d.setDate(d.getDate() - 1)
-                          return movDate === d.toISOString().split('T')[0]
-                        })()
-                          ? 'bg-[#202932] text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      Kemarin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMovTime(getCurrentTime())}
-                      className="px-2 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 active:scale-95 transition flex items-center gap-1"
-                    >
-                      <Clock size={11} /> Jam Sekarang
-                    </button>
+                    <span className="font-mono text-slate-500 text-[10px] font-medium">
+                      {fmt(movDate ? `${movDate}T${movTime || '00:00'}` : null)}
+                    </span>
                   </div>
                 </div>
 
@@ -1900,11 +1956,11 @@ function MovementTable({
                   <p className="mt-0.5 text-[10px] text-slate-400">{partInfo?.part || 'Part'}</p>
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-slate-500">
-                  <p className="font-semibold text-slate-700">{m.date.split(' ')[0]}</p>
-                  {m.date.split(' ')[1] && (
+                  <p className="font-semibold text-slate-700">{parseDateTimeString(m.date).date}</p>
+                  {parseDateTimeString(m.date).time && (
                     <p className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
                       <Clock size={10} />
-                      {m.date.split(' ')[1]}
+                      {parseDateTimeString(m.date).time}
                     </p>
                   )}
                 </td>
@@ -2088,10 +2144,10 @@ function RiwayatTable({
                     <div>
                       <div className="flex items-center gap-1.5 text-slate-200 font-semibold text-xs">
                         <Clock size={12} className="text-[#f4c430]/80" />
-                        <span>{m.date.split(' ')[0]}</span>
-                        {m.date.split(' ')[1] && (
+                        <span>{parseDateTimeString(m.date).date}</span>
+                        {parseDateTimeString(m.date).time && (
                           <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-semibold border border-white/5">
-                            {m.date.split(' ')[1]}
+                            {parseDateTimeString(m.date).time}
                           </span>
                         )}
                       </div>
