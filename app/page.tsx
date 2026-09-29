@@ -157,6 +157,22 @@ function fmtClock(iso?: string | null): string {
   })
 }
 
+/**
+ * Konversi ISO/datetime string → nilai untuk input[type=datetime-local]
+ * Standar PKIS-PLUS: toLocalInput()
+ */
+function toLocalInput(dtStr?: string | null): string {
+  if (!dtStr) return ''
+  const d = new Date(dtStr.includes('T') ? dtStr : dtStr.replace(' ', 'T'))
+  if (isNaN(d.getTime())) return ''
+  const yyyy = d.getFullYear()
+  const MM = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${MM}-${dd}T${hh}:${mm}`
+}
+
 export default function Page() {
   const [activePage, setActivePage] = useState('Dashboard')
   
@@ -193,12 +209,12 @@ export default function Page() {
   const [riwayatPage, setRiwayatPage] = useState(1)
   const RIWAYAT_PAGE_SIZE = 20
 
-  // Movement Form fields (PKIS-PLUS standard)
+  // Movement Form fields — PKIS-PLUS style: single datetime-local
+  const [editingMovementId, setEditingMovementId] = useState<string | null>(null)
   const [movType, setMovType] = useState<'IN' | 'OUT'>('IN')
   const [selectedPartId, setSelectedPartId] = useState('')
   const [movQty, setMovQty] = useState('100')
-  const [movDate, setMovDate] = useState(() => getLocalDateString())
-  const [movTime, setMovTime] = useState(() => getLocalTimeString())
+  const [movDatetime, setMovDatetime] = useState(() => toLocalInput(new Date().toISOString()))
   const [movNote, setMovNote] = useState('')
 
   // Part Form fields
@@ -416,19 +432,36 @@ export default function Page() {
     } else if (currentRole === 'PRODUCTION') {
       setMovType('OUT')
     }
-    setMovDate(getLocalDateString())
-    setMovTime(getLocalTimeString())
+    setEditingMovementId(null)
+    setMovDatetime(toLocalInput(new Date().toISOString()))
     setMovQty('100')
     setMovNote('')
     setShowMovementForm(true)
   }
 
+  /** Pre-fill form dari row yang diklik — pola PKIS-PLUS handleEditProductionRow */
+  function handleEditMovement(m: MovementItem) {
+    // Supervisor bisa edit semua; operator hanya bisa edit milik role-nya
+    if (currentRole !== 'SUPERVISOR' && m.role !== currentRole) {
+      alert('Anda tidak berwenang mengedit transaksi ini.')
+      return
+    }
+    setEditingMovementId(m.id)
+    setSelectedPartId(m.partId)
+    setMovType(m.type)
+    setMovQty(String(m.qty))
+    setMovDatetime(toLocalInput(m.date))
+    setMovNote(m.note === '-' ? '' : m.note)
+    setShowMovementForm(true)
+  }
+
   function handleCloseMovementForm() {
     setShowMovementForm(false)
+    setEditingMovementId(null)
     setMovNote('')
   }
 
-  // Add Movement handler with Role Enforcement
+  // Save Movement (add or edit) with Role Enforcement — pola PKIS-PLUS
   function handleAddMovement() {
     const qty = Number(movQty)
     if (!selectedPartId || !qty || qty < 1) return
@@ -439,24 +472,35 @@ export default function Page() {
       return
     }
 
-    const datePart = movDate || getLocalDateString()
-    const timePart = movTime || getLocalTimeString()
-    // Format ISO 8601 standard PKIS-PLUS
-    const fullDate = `${datePart}T${timePart}`
+    // Format ISO 8601 standard PKIS-PLUS — simpan dari datetime-local value
+    const fullDate = movDatetime || toLocalInput(new Date().toISOString())
 
-    const newMov: MovementItem = {
-      id: `TRX-${String(movements.length + 1).padStart(4, '0')}`,
-      partId: selectedPartId,
-      date: fullDate,
-      type: movType,
-      qty,
-      note: movNote.trim() || '-',
-      operator: ROLES[currentRole].name,
-      role: currentRole,
+    if (editingMovementId) {
+      // Mode EDIT: update existing movement
+      setMovements((prev) =>
+        prev.map((m) =>
+          m.id === editingMovementId
+            ? { ...m, partId: selectedPartId, date: fullDate, type: movType, qty, note: movNote.trim() || '-' }
+            : m
+        )
+      )
+    } else {
+      // Mode ADD: tambah baru
+      const newMov: MovementItem = {
+        id: `TRX-${String(movements.length + 1).padStart(4, '0')}`,
+        partId: selectedPartId,
+        date: fullDate,
+        type: movType,
+        qty,
+        note: movNote.trim() || '-',
+        operator: ROLES[currentRole].name,
+        role: currentRole,
+      }
+      setMovements((prev) => [newMov, ...prev])
     }
 
-    setMovements((prev) => [newMov, ...prev])
     setShowMovementForm(false)
+    setEditingMovementId(null)
     setMovQty('100')
     setMovNote('')
   }
@@ -687,6 +731,7 @@ export default function Page() {
                     parts={parts}
                     onDelete={handleDeleteMovement}
                     onAddNew={handleOpenMovementForm}
+                    onEdit={handleEditMovement}
                   />
                 </section>
 
@@ -820,6 +865,7 @@ export default function Page() {
                   parts={parts}
                   onDelete={handleDeleteMovement}
                   onAddNew={handleOpenMovementForm}
+                  onEdit={handleEditMovement}
                 />
               </div>
             </>
@@ -1281,6 +1327,7 @@ export default function Page() {
                       movements={riwayatPagedData}
                       parts={parts}
                       onDelete={handleDeleteMovement}
+                      onEdit={handleEditMovement}
                       currentUser="Operator"
                     />
 
@@ -1364,7 +1411,9 @@ export default function Page() {
             <div className="flex items-start justify-between border-b border-slate-100 p-6">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-[#a17e00]">Form Mutasi Stok</p>
-                <h2 className="mt-1 text-xl font-bold">Input Pergerakan Barang</h2>
+                <h2 className="mt-1 text-xl font-bold">
+                  {editingMovementId ? 'Edit Transaksi Mutasi' : 'Input Pergerakan Barang'}
+                </h2>
               </div>
               <button
                 onClick={handleCloseMovementForm}
@@ -1407,7 +1456,7 @@ export default function Page() {
                 )}
               </div>
 
-              {/* ── Tanggal & Waktu (full-width, no nesting crunch) ── */}
+              {/* ── Tanggal & Waktu (PKIS-PLUS style: datetime-local) ── */}
               <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
@@ -1418,93 +1467,48 @@ export default function Page() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setMovDate(getLocalDateString())}
-                      className={`text-[10px] font-bold px-2 py-1 rounded-lg cursor-pointer active:scale-95 transition ${
-                        movDate === getLocalDateString()
-                          ? 'text-blue-700 bg-blue-100 border border-blue-300'
-                          : 'text-slate-500 bg-slate-100 hover:bg-slate-200'
-                      }`}
+                      onClick={() => setMovDatetime(toLocalInput(new Date().toISOString()))}
+                      className="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg border border-emerald-200 cursor-pointer active:scale-95 transition flex items-center gap-0.5"
+                    >
+                      ⚡ Sekarang
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date()
+                        d.setHours(0, 0, 0, 0)
+                        setMovDatetime(toLocalInput(d.toISOString()))
+                      }}
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer active:scale-95 transition"
                     >
                       Hari Ini
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        const target = new Date()
-                        target.setDate(target.getDate() - 1)
-                        setMovDate(getLocalDateString(target))
+                        const d = new Date()
+                        d.setDate(d.getDate() - 1)
+                        d.setHours(0, 0, 0, 0)
+                        setMovDatetime(toLocalInput(d.toISOString()))
                       }}
-                      className={`text-[10px] font-bold px-2 py-1 rounded-lg cursor-pointer active:scale-95 transition ${
-                        (() => {
-                          const d = new Date()
-                          d.setDate(d.getDate() - 1)
-                          return movDate === getLocalDateString(d)
-                        })()
-                          ? 'text-blue-700 bg-blue-100 border border-blue-300'
-                          : 'text-slate-500 bg-slate-100 hover:bg-slate-200'
-                      }`}
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer active:scale-95 transition"
                     >
                       Kemarin
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const now = new Date()
-                        setMovDate(getLocalDateString(now))
-                        setMovTime(getLocalTimeString(now))
-                      }}
-                      className="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg cursor-pointer active:scale-95 transition flex items-center gap-0.5 border border-emerald-200"
-                    >
-                      ⚡ Sekarang
-                    </button>
                   </div>
                 </div>
 
-                {/* Date + Time inputs side-by-side */}
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={movDate}
-                    onChange={(e) => setMovDate(e.target.value)}
-                    className="flex-1 h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-mono font-semibold outline-none focus:border-[#eab308]"
-                  />
-                  <input
-                    type="time"
-                    value={movTime}
-                    onChange={(e) => setMovTime(e.target.value)}
-                    className="w-[110px] h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm font-mono font-semibold outline-none focus:border-[#eab308]"
-                  />
-                </div>
+                {/* Single datetime-local input */}
+                <input
+                  type="datetime-local"
+                  value={movDatetime}
+                  onChange={(e) => setMovDatetime(e.target.value)}
+                  className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-mono font-semibold outline-none focus:border-[#eab308]"
+                />
 
-                {/* Day stepper + live preview */}
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const base = movDate ? new Date(movDate) : new Date()
-                        base.setDate(base.getDate() - 1)
-                        setMovDate(getLocalDateString(base))
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-[11px] active:scale-95 transition"
-                    >
-                      ◀ -1 Hari
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const base = movDate ? new Date(movDate) : new Date()
-                        base.setDate(base.getDate() + 1)
-                        setMovDate(getLocalDateString(base))
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-[11px] active:scale-95 transition"
-                    >
-                      +1 Hari ▶
-                    </button>
-                  </div>
-                  <span className="font-mono text-[11px] text-slate-500 font-semibold">
-                    {fmt(movDate ? `${movDate}T${movTime || '00:00'}` : null)}
-                  </span>
+                {/* Live formatted date preview */}
+                <div className="text-[11px] text-slate-500 font-mono font-semibold text-right">
+                  {fmt(movDatetime || null)}
                 </div>
               </div>
 
@@ -1628,11 +1632,32 @@ export default function Page() {
                 </div>
                 <input
                   type="text"
+                  list="movNoteOptions"
                   value={movNote}
                   onChange={(e) => setMovNote(e.target.value)}
                   placeholder="Pilih preset di bawah atau ketik..."
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#eab308] mb-2"
                 />
+                <datalist id="movNoteOptions">
+                  {movType === 'IN' ? (
+                    <>
+                      <option value="Input dari Supplier" />
+                      <option value="Bongkar Kontainer" />
+                      <option value="Retur Produksi" />
+                      <option value="Koreksi Stok Fisik" />
+                      <option value="Material Baru" />
+                    </>
+                  ) : (
+                    <>
+                      <option value="Pemakaian Line YHA" />
+                      <option value="Pemakaian Line YHB" />
+                      <option value="Supply Setting Dies" />
+                      <option value="Scrap / Part Defect" />
+                      <option value="Trial Produksi" />
+                      <option value="Sample QC" />
+                    </>
+                  )}
+                </datalist>
                 <div className="flex flex-wrap gap-1.5">
                   {(movType === 'IN'
                     ? ['Input dari Supplier', 'Bongkar Kontainer', 'Retur Produksi', 'Koreksi Stok Fisik', 'Material Baru']
@@ -1709,7 +1734,7 @@ export default function Page() {
                 onClick={handleAddMovement}
                 className="rounded-xl bg-[#202932] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#2c3945] disabled:opacity-50 shadow-sm transition active:scale-95"
               >
-                💾 Simpan Transaksi
+                {editingMovementId ? '💾 Simpan Perubahan' : '💾 Simpan Transaksi'}
               </button>
             </div>
           </div>
@@ -1900,11 +1925,13 @@ function MovementTable({
   parts,
   onDelete,
   onAddNew,
+  onEdit,
 }: {
   movements: MovementItem[]
   parts: PartItem[]
   onDelete: (id: string) => void
   onAddNew: () => void
+  onEdit?: (m: MovementItem) => void
 }) {
   return (
     <div className="overflow-x-auto">
@@ -1924,7 +1951,11 @@ function MovementTable({
           {movements.map((m) => {
             const partInfo = parts.find((p) => p.id === m.partId)
             return (
-              <tr key={m.id} className="hover:bg-slate-50/80 transition">
+              <tr
+                key={m.id}
+                onClick={() => onEdit?.(m)}
+                className="hover:bg-slate-50/80 cursor-pointer transition group"
+              >
                 <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-700">{m.id}</td>
                 <td className="px-3 py-4">
                   <p className="font-bold text-slate-800">{m.partId}</p>
@@ -1959,13 +1990,30 @@ function MovementTable({
                   {formatNumber(m.qty)}
                 </td>
                 <td className="px-4 py-4 text-center">
-                  <button
-                    onClick={() => onDelete(m.id)}
-                    title="Hapus transaksi"
-                    className="p-1 text-slate-300 hover:text-rose-500 transition rounded"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex items-center justify-center gap-1">
+                    {onEdit && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onEdit(m)
+                        }}
+                        title="Edit transaksi"
+                        className="p-1 text-slate-400 hover:text-amber-500 transition rounded"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDelete(m.id)
+                      }}
+                      title="Hapus transaksi"
+                      className="p-1 text-slate-300 hover:text-rose-500 transition rounded"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             )
@@ -2064,11 +2112,13 @@ function RiwayatTable({
   movements,
   parts,
   onDelete,
+  onEdit,
   currentUser = 'Operator',
 }: {
   movements: MovementItem[]
   parts: PartItem[]
   onDelete: (id: string) => void
+  onEdit?: (m: MovementItem) => void
   currentUser?: string
 }) {
   return (
@@ -2101,7 +2151,8 @@ function RiwayatTable({
             return (
               <tr
                 key={m.id}
-                className="riwayat-table-row transition-colors group"
+                onClick={() => onEdit?.(m)}
+                className="riwayat-table-row transition-colors group cursor-pointer"
               >
                 {/* Waktu */}
                 <td className="px-5 py-3.5 whitespace-nowrap">
@@ -2232,14 +2283,24 @@ function RiwayatTable({
                 <td className="px-4 py-3.5 text-center whitespace-nowrap">
                   <div className="flex items-center justify-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => alert(`Detail Mutasi ${m.id}:\nPart: ${partInfo?.part || m.partId}\nTipe: ${m.type}\nQty: ${m.qty}\nTanggal: ${m.date}\nCatatan: ${m.note || '-'}`)}
-                      title="Edit / Detail catatan transaksi"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (onEdit) {
+                          onEdit(m)
+                        } else {
+                          alert(`Detail Mutasi ${m.id}:\nPart: ${partInfo?.part || m.partId}\nTipe: ${m.type}\nQty: ${m.qty}\nTanggal: ${m.date}\nCatatan: ${m.note || '-'}`)
+                        }
+                      }}
+                      title="Edit transaksi"
                       className="p-1.5 rounded-lg text-slate-400 hover:text-[#f4c430] hover:bg-white/5 transition"
                     >
                       <Edit2 size={13} />
                     </button>
                     <button
-                      onClick={() => onDelete(m.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDelete(m.id)
+                      }}
                       title="Hapus transaksi"
                       className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
                     >
