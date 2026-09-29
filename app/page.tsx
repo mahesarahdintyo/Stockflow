@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, Fragment } from 'react'
 import {
   ArrowDownToLine,
+  ArrowLeftRight,
   ArrowUpFromLine,
   BarChart3,
   Bell,
@@ -187,8 +188,19 @@ export default function Page() {
 
   // Filters state
   const [query, setQuery] = useState('')
-  const [month, setMonth] = useState('September 2026')
   const [lineFilter, setLineFilter] = useState('All lines')
+
+  // Stock Movement (Stock Bulanan) states
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const d = new Date()
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    return `${yyyy}-${mm}`
+  })
+  const [monthlyItemFilter, setMonthlyItemFilter] = useState('ALL')
+  const [monthlyLineFilter, setMonthlyLineFilter] = useState('All lines')
+  const [monthlySearch, setMonthlySearch] = useState('')
+  const [stockMovementView, setStockMovementView] = useState<'matrix' | 'list'>('matrix')
 
   // Role state (RBAC Simulator)
   const [currentRole, setCurrentRole] = useState<UserRole>('SUPERVISOR')
@@ -337,6 +349,205 @@ export default function Page() {
     })
     return Array.from(set)
   }, [parts])
+
+  // Month navigation handlers for Stock Bulanan
+  function handlePrevMonth() {
+    const [y, m] = (selectedMonth || '2026-09').split('-').map(Number)
+    const prev = new Date(y, m - 2, 1)
+    const yyyy = prev.getFullYear()
+    const mm = String(prev.getMonth() + 1).padStart(2, '0')
+    setSelectedMonth(`${yyyy}-${mm}`)
+  }
+
+  function handleNextMonth() {
+    const [y, m] = (selectedMonth || '2026-09').split('-').map(Number)
+    const next = new Date(y, m, 1)
+    const yyyy = next.getFullYear()
+    const mm = String(next.getMonth() + 1).padStart(2, '0')
+    setSelectedMonth(`${yyyy}-${mm}`)
+  }
+
+  function handleCurrentMonth() {
+    const now = new Date()
+    const yyyy = now.getFullYear()
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    setSelectedMonth(`${yyyy}-${mm}`)
+  }
+
+  // Monthly Matrix metadata (days, dates, label)
+  const monthMeta = useMemo(() => {
+    const [y, m] = (selectedMonth || '2026-09').split('-').map(Number)
+    const daysCount = new Date(y, m, 0).getDate()
+    const daysList = Array.from({ length: daysCount }, (_, i) => i + 1)
+    const dObj = new Date(y, m - 1, 1)
+    const labelIndo = dObj.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+    return {
+      year: y,
+      month: m,
+      daysCount,
+      daysList,
+      labelIndo,
+    }
+  }, [selectedMonth])
+
+  // Filtered parts for Stock Bulanan
+  const filteredMonthlyParts = useMemo(() => {
+    return parts.filter((p) => {
+      const matchItem = monthlyItemFilter === 'ALL' || p.id === monthlyItemFilter
+      const matchLine = monthlyLineFilter === 'All lines' || p.line === monthlyLineFilter
+      const queryTarget = `${p.id} ${p.part} ${p.spec} ${p.coil} Line ${p.line}`.toLowerCase()
+      const matchSearch = !monthlySearch || queryTarget.includes(monthlySearch.toLowerCase())
+      return matchItem && matchLine && matchSearch
+    })
+  }, [parts, monthlyItemFilter, monthlyLineFilter, monthlySearch])
+
+  // Monthly Matrix Data (AWAL, IN, OUT, SISA per day 01..31)
+  const monthlyMatrixData = useMemo(() => {
+    const monthStartStr = `${selectedMonth}-01`
+    const todayStr = getLocalDateString()
+
+    return filteredMonthlyParts.map((p) => {
+      // 1. Calculate opening balance as of the first day of selectedMonth
+      let priorStock = p.opening
+      for (const m of movements) {
+        if (m.partId === p.id) {
+          const mDateOnly = m.date.slice(0, 10)
+          if (mDateOnly < monthStartStr) {
+            if (m.type === 'IN') priorStock += m.qty
+            else if (m.type === 'OUT') priorStock -= m.qty
+          }
+        }
+      }
+
+      // 2. Pre-filter all movements for this part in selectedMonth
+      const monthMovs = movements.filter(
+        (m) => m.partId === p.id && m.date.slice(0, 7) === selectedMonth
+      )
+
+      // 3. Compute daily progression
+      let runningStock = priorStock
+      let totalMonthIn = 0
+      let totalMonthOut = 0
+
+      const daily = monthMeta.daysList.map((dayNum) => {
+        const dayStr = `${selectedMonth}-${String(dayNum).padStart(2, '0')}`
+        const dayDate = new Date(monthMeta.year, monthMeta.month - 1, dayNum)
+        const dayOfWeekShort = dayDate.toLocaleDateString('id-ID', { weekday: 'short' })
+        const isToday = dayStr === todayStr
+
+        let dayIn = 0
+        let dayOut = 0
+        for (const m of monthMovs) {
+          if (m.date.startsWith(dayStr)) {
+            if (m.type === 'IN') dayIn += m.qty
+            else if (m.type === 'OUT') dayOut += m.qty
+          }
+        }
+
+        const awal = runningStock
+        const sisa = awal + dayIn - dayOut
+        runningStock = sisa
+        totalMonthIn += dayIn
+        totalMonthOut += dayOut
+
+        return {
+          dayNum: String(dayNum).padStart(2, '0'),
+          dayStr,
+          dayOfWeekShort,
+          isToday,
+          awal,
+          inQty: dayIn,
+          outQty: dayOut,
+          sisa,
+        }
+      })
+
+      const finalSisa = daily.length > 0 ? daily[daily.length - 1].sisa : priorStock
+
+      return {
+        part: p,
+        priorStock,
+        daily,
+        totalIn: totalMonthIn,
+        totalOut: totalMonthOut,
+        finalSisa,
+      }
+    })
+  }, [filteredMonthlyParts, movements, selectedMonth, monthMeta])
+
+  // Summary stats for monthly matrix
+  const monthlyTotals = useMemo(() => {
+    const totalParts = filteredMonthlyParts.length
+    const totalIn = monthlyMatrixData.reduce((acc, cur) => acc + cur.totalIn, 0)
+    const totalOut = monthlyMatrixData.reduce((acc, cur) => acc + cur.totalOut, 0)
+    const totalFinalStock = monthlyMatrixData.reduce((acc, cur) => acc + cur.finalSisa, 0)
+    return { totalParts, totalIn, totalOut, totalFinalStock }
+  }, [filteredMonthlyParts, monthlyMatrixData])
+
+  // Export Stock Bulanan to Excel (CSV with UTF-8 BOM)
+  function handleExportMonthlyStockExcel() {
+    if (monthlyMatrixData.length === 0) {
+      alert('Tidak ada data material untuk diekspor.')
+      return
+    }
+    const dayHeaders = monthMeta.daysList.map((d) => String(d).padStart(2, '0'))
+    const headers = ['KODE PART', 'NAMA PART', 'SPEC', 'LINE', 'DATA', ...dayHeaders, 'TOTAL']
+    const rows: (string | number)[][] = []
+
+    monthlyMatrixData.forEach((item) => {
+      // Row AWAL
+      rows.push([
+        item.part.id,
+        `"${item.part.part}"`,
+        `"${item.part.spec}"`,
+        item.part.line,
+        'AWAL',
+        ...item.daily.map((d) => d.awal),
+        item.daily[0]?.awal ?? item.priorStock,
+      ])
+      // Row IN
+      rows.push([
+        item.part.id,
+        `"${item.part.part}"`,
+        `"${item.part.spec}"`,
+        item.part.line,
+        'IN',
+        ...item.daily.map((d) => d.inQty),
+        item.totalIn,
+      ])
+      // Row OUT
+      rows.push([
+        item.part.id,
+        `"${item.part.part}"`,
+        `"${item.part.spec}"`,
+        item.part.line,
+        'OUT',
+        ...item.daily.map((d) => d.outQty),
+        item.totalOut,
+      ])
+      // Row SISA
+      rows.push([
+        item.part.id,
+        `"${item.part.part}"`,
+        `"${item.part.spec}"`,
+        item.part.line,
+        'SISA',
+        ...item.daily.map((d) => d.sisa),
+        item.finalSisa,
+      ])
+    })
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `Stock_Bulanan_${selectedMonth}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
 
   // Riwayat filtered movements
   const riwayatFiltered = useMemo(() => {
@@ -807,38 +1018,154 @@ export default function Page() {
             </>
           )}
 
-          {/* STOCK MOVEMENT PAGE */}
+          {/* STOCK MOVEMENT (STOCK BULANAN) PAGE */}
           {activePage === 'Stock Movement' && (
             <>
-              <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-                <div>
-                  <p className="mb-1 text-sm text-slate-500">Pencatatan mutasi barang masuk & keluar</p>
-                  <h2 className="text-2xl font-bold">Stock Movement</h2>
+              {/* Top Dark Header Bar (PKIS / Factory style, elevated modern) */}
+              <div className="mb-6 rounded-2xl bg-[#17202b] text-white p-4 sm:p-5 shadow-lg border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f4c430]/15 text-[#f4c430] border border-[#f4c430]/20 shadow-inner">
+                    <ClipboardList size={22} strokeWidth={2.5} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold tracking-tight text-white">Stock Bulanan</h2>
+                      <span className="hidden sm:inline-block rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
+                        Laporan Harian
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Monitoring saldo awal, mutasi masuk/keluar, dan sisa stok harian selama 1 bulan penuh
+                    </p>
+                  </div>
                 </div>
-                <button
-                  onClick={handleOpenMovementForm}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-[#202932] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#2c3945]"
-                >
-                  <Plus size={16} /> Input Movement
-                </button>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => setActivePage('Dashboard')}
+                    title="Kembali ke Dashboard Utama"
+                    className="px-4 py-2 rounded-xl bg-[#e11d48] hover:bg-[#be123c] text-white text-xs font-extrabold uppercase tracking-wider shadow-sm transition active:scale-95 flex items-center gap-1.5"
+                  >
+                    <ChevronLeft size={15} /> KEMBALI
+                  </button>
+                  <button
+                    onClick={handleOpenMovementForm}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-[#f4c430] hover:bg-[#eab308] px-4 py-2 text-xs font-bold text-[#17202b] shadow-sm transition active:scale-95"
+                  >
+                    <Plus size={16} /> Input Mutasi
+                  </button>
+                </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative">
-                      <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Cari transaksi atau part..."
-                        className="w-64 rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-[#eab308]"
-                      />
+              {/* View Switcher & Quick Stat Badges */}
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex rounded-xl bg-slate-200/80 p-1 border border-slate-300">
+                  <button
+                    type="button"
+                    onClick={() => setStockMovementView('matrix')}
+                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                      stockMovementView === 'matrix'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <FileSpreadsheet size={14} className={stockMovementView === 'matrix' ? 'text-emerald-600' : ''} />
+                    Matriks Bulanan (Tabel Harian)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStockMovementView('list')}
+                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                      stockMovementView === 'list'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <History size={14} className={stockMovementView === 'list' ? 'text-indigo-600' : ''} />
+                    Log Daftar Mutasi
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                  <span>Periode Aktif:</span>
+                  <span className="font-bold text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs">
+                    📅 {monthMeta.labelIndo} ({monthMeta.daysCount} Hari)
+                  </span>
+                </div>
+              </div>
+
+              {/* Filter Card (Matching user screenshot) */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm mb-5">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                  {/* BULAN */}
+                  <div className="md:col-span-4 space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                      BULAN
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handlePrevMonth}
+                        title="Bulan Sebelumnya"
+                        className="h-10 w-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 font-bold active:scale-95 transition"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <div className="relative flex-1">
+                        <input
+                          type="month"
+                          value={selectedMonth}
+                          onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-semibold text-xs text-slate-800 outline-none focus:border-[#f4c430]"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleNextMonth}
+                        title="Bulan Berikutnya"
+                        className="h-10 w-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 font-bold active:scale-95 transition"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCurrentMonth}
+                        title="Kembali ke Bulan Berjalan"
+                        className="h-10 px-2.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] active:scale-95 transition"
+                      >
+                        Bulan Ini
+                      </button>
                     </div>
+                  </div>
+
+                  {/* ITEM (STANDAR: SEMUA ITEM) */}
+                  <div className="md:col-span-3 space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                      ITEM (STANDAR: SEMUA ITEM)
+                    </label>
                     <select
-                      value={lineFilter}
-                      onChange={(e) => setLineFilter(e.target.value)}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 outline-none"
+                      value={monthlyItemFilter}
+                      onChange={(e) => setMonthlyItemFilter(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none focus:border-[#f4c430]"
+                    >
+                      <option value="ALL">SEMUA ITEM</option>
+                      {parts.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.id} - {p.part} (Line {p.line})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* LINE FILTER */}
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                      LINE
+                    </label>
+                    <select
+                      value={monthlyLineFilter}
+                      onChange={(e) => setMonthlyLineFilter(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none focus:border-[#f4c430]"
                     >
                       <option value="All lines">Semua Line</option>
                       {availableLines.map((l) => (
@@ -847,27 +1174,356 @@ export default function Page() {
                         </option>
                       ))}
                     </select>
-
-                    <select
-                      value={movementTypeFilter}
-                      onChange={(e) => setMovementTypeFilter(e.target.value as 'ALL' | 'IN' | 'OUT')}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 outline-none"
-                    >
-                      <option value="ALL">Semua Tipe (IN & OUT)</option>
-                      <option value="IN">🟢 Barang Masuk (IN)</option>
-                      <option value="OUT">🔴 Barang Keluar (OUT)</option>
-                    </select>
                   </div>
-                  <span className="text-xs text-slate-400">Total: {visibleMovements.length} transaksi</span>
+
+                  {/* EXPORT EXCEL BUTTON (Matching screenshot) */}
+                  <div className="md:col-span-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleExportMonthlyStockExcel}
+                      className="w-full h-10 rounded-xl bg-[#107c41] hover:bg-[#0c6233] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition active:scale-95"
+                    >
+                      <FileSpreadsheet size={16} />
+                      <span>EXPORT EXCEL</span>
+                    </button>
+                  </div>
                 </div>
-                <MovementTable
-                  movements={visibleMovements}
-                  parts={parts}
-                  onDelete={handleDeleteMovement}
-                  onAddNew={handleOpenMovementForm}
-                  onEdit={handleEditMovement}
-                />
+
+                {/* Optional Quick Search bar */}
+                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                  <div className="relative w-full sm:w-72">
+                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      value={monthlySearch}
+                      onChange={(e) => setMonthlySearch(e.target.value)}
+                      placeholder="Cari part number, nama, spec..."
+                      className="w-full h-9 rounded-lg border border-slate-200 pl-8 pr-3 text-xs outline-none focus:border-[#f4c430]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span>
+                      Menampilkan <strong>{filteredMonthlyParts.length}</strong> dari <strong>{parts.length}</strong> part
+                    </span>
+                    {(monthlyItemFilter !== 'ALL' || monthlyLineFilter !== 'All lines' || monthlySearch) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMonthlyItemFilter('ALL')
+                          setMonthlyLineFilter('All lines')
+                          setMonthlySearch('')
+                        }}
+                        className="text-amber-600 hover:underline font-bold text-xs"
+                      >
+                        Reset Filter
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
+
+              {/* Monthly Summary Metric Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material</p>
+                  <p className="text-lg font-bold text-slate-800 mt-0.5">{monthlyTotals.totalParts} Item</p>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3.5 shadow-xs">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Total Masuk (IN)</p>
+                  <p className="text-lg font-bold text-emerald-600 mt-0.5">+{formatNumber(monthlyTotals.totalIn)} pcs</p>
+                </div>
+                <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-3.5 shadow-xs">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Total Keluar (OUT)</p>
+                  <p className="text-lg font-bold text-rose-600 mt-0.5">-{formatNumber(monthlyTotals.totalOut)} pcs</p>
+                </div>
+                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3.5 shadow-xs">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Saldo Akhir Bulan</p>
+                  <p className="text-lg font-bold text-blue-600 mt-0.5">{formatNumber(monthlyTotals.totalFinalStock)} pcs</p>
+                </div>
+              </div>
+
+              {/* Hint Scroll Banner (Exact from user screenshot) */}
+              <div className="bg-[#e0f7fa] border border-[#80deea] text-[#006064] px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs mb-4">
+                <ArrowLeftRight size={16} className="text-[#00838f] shrink-0" />
+                <span>
+                  Geser tabel ke kanan atau kiri untuk melihat seluruh tanggal (01 s/d {monthMeta.daysCount} {monthMeta.labelIndo}).
+                </span>
+              </div>
+
+              {/* Main Content Area */}
+              {stockMovementView === 'matrix' ? (
+                /* ── MONTHLY MATRIX TABLE ── */
+                <div className="rounded-2xl border border-slate-300 bg-white shadow-md overflow-hidden">
+                  <div className="overflow-x-auto relative">
+                    <table className="w-full text-left border-collapse text-xs">
+                      {/* Dark table header */}
+                      <thead>
+                        <tr className="bg-[#17202b] text-white border-b border-slate-700 text-[11px] font-bold">
+                          {/* Sticky Item / Data Header */}
+                          <th className="sticky left-0 z-30 bg-[#17202b] px-4 py-3.5 min-w-[200px] sm:min-w-[220px] border-r border-slate-700 shadow-[2px_0_6px_rgba(0,0,0,0.25)]">
+                            <span className="tracking-wider uppercase text-slate-200">ITEM / DATA</span>
+                          </th>
+
+                          {/* Day Columns 01..31 */}
+                          {monthMeta.daysList.map((dayNum) => {
+                            const dayDate = new Date(monthMeta.year, monthMeta.month - 1, dayNum)
+                            const isWeekend = dayDate.getDay() === 0 || dayDate.getDay() === 6
+                            const dayStr = `${selectedMonth}-${String(dayNum).padStart(2, '0')}`
+                            const isToday = dayStr === getLocalDateString()
+
+                            return (
+                              <th
+                                key={dayNum}
+                                className={`px-2 py-3 text-center min-w-[58px] border-r border-slate-700/60 transition ${
+                                  isToday
+                                    ? 'bg-amber-500/20 text-[#f4c430] border-t-2 border-t-[#f4c430]'
+                                    : isWeekend
+                                    ? 'bg-slate-800/60 text-slate-400'
+                                    : 'text-slate-200'
+                                }`}
+                              >
+                                <div className="text-[12px] font-bold font-mono">
+                                  {String(dayNum).padStart(2, '0')}
+                                </div>
+                                <div className="text-[9px] font-normal text-slate-400 lowercase">
+                                  {dayDate.toLocaleDateString('id-ID', { weekday: 'short' })}
+                                </div>
+                              </th>
+                            )
+                          })}
+
+                          {/* Summary Columns */}
+                          <th className="px-3 py-3 text-right min-w-[75px] bg-[#17202b] text-emerald-400 border-l border-slate-700 font-bold">
+                            TOTAL IN
+                          </th>
+                          <th className="px-3 py-3 text-right min-w-[75px] bg-[#17202b] text-rose-400 border-l border-slate-700 font-bold">
+                            TOTAL OUT
+                          </th>
+                          <th className="px-3 py-3 text-right min-w-[85px] bg-[#17202b] text-blue-300 border-l border-slate-700 font-bold">
+                            SISA AKHIR
+                          </th>
+                        </tr>
+                      </thead>
+
+                      {/* Table Body */}
+                      <tbody className="divide-y divide-slate-200">
+                        {monthlyMatrixData.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={monthMeta.daysCount + 4}
+                              className="px-6 py-14 text-center text-slate-400"
+                            >
+                              <Boxes size={36} className="mx-auto mb-2 text-slate-300" />
+                              <p className="font-bold text-sm text-slate-600">Tidak ada item material yang sesuai.</p>
+                              <p className="text-xs text-slate-400 mt-1">
+                                Silakan sesuaikan filter atau tambahkan master part terlebih dahulu.
+                              </p>
+                              {parts.length === 0 && (
+                                <button
+                                  type="button"
+                                  onClick={handleOpenPartForm}
+                                  className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#202932] text-white font-bold text-xs hover:bg-[#2c3945]"
+                                >
+                                  <Plus size={14} /> Tambah Master Part
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ) : (
+                          monthlyMatrixData.map((item) => (
+                            <React.Fragment key={item.part.id}>
+                              {/* ── Item Banner Row (Matching screenshot's red bar item header) ── */}
+                              <tr className="bg-slate-200/90 border-t-2 border-slate-300">
+                                <td className="sticky left-0 z-20 bg-slate-200 px-4 py-2.5 font-bold border-r border-slate-300 shadow-[2px_0_6px_rgba(0,0,0,0.06)]">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2.5 py-0.5 rounded bg-[#e11d48] text-white font-mono font-extrabold text-xs shadow-xs tracking-wide">
+                                      {item.part.id}
+                                    </span>
+                                    <span className="font-extrabold text-slate-900 text-xs truncate max-w-[130px]" title={item.part.part}>
+                                      {item.part.part}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td
+                                  colSpan={monthMeta.daysCount + 3}
+                                  className="px-4 py-2 text-[11px] font-semibold text-slate-700 bg-slate-200/90"
+                                >
+                                  <div className="flex flex-wrap items-center gap-3">
+                                    <span className="px-2 py-0.5 rounded bg-white text-slate-800 font-bold border border-slate-300 text-[10px]">
+                                      Line {item.part.line}
+                                    </span>
+                                    <span>
+                                      Coil: <strong className="text-slate-900">{item.part.coil}</strong>
+                                    </span>
+                                    <span>&middot;</span>
+                                    <span>
+                                      Spec: <strong className="text-slate-900">{item.part.spec}</strong>
+                                    </span>
+                                    <span>&middot;</span>
+                                    <span>
+                                      Stok Awal Master: <strong className="text-slate-900">{formatNumber(item.part.opening)} pcs</strong>
+                                    </span>
+                                  </div>
+                                </td>
+                              </tr>
+
+                              {/* ── Sub-row 1: AWAL ── */}
+                              <tr className="hover:bg-slate-50/70 transition-colors">
+                                <td className="sticky left-0 z-20 bg-white px-4 py-2 text-center font-bold text-[11px] text-slate-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                  AWAL
+                                </td>
+                                {item.daily.map((d) => (
+                                  <td
+                                    key={d.dayNum}
+                                    className={`px-2 py-2 text-center font-mono font-semibold text-xs border-r border-slate-100 ${
+                                      d.isToday ? 'bg-amber-50/40 text-slate-800 font-bold' : 'text-slate-700'
+                                    }`}
+                                  >
+                                    {formatNumber(d.awal)}
+                                  </td>
+                                ))}
+                                <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-slate-50 text-slate-700" colSpan={3}>
+                                  {formatNumber(item.daily[0]?.awal ?? item.priorStock)}
+                                </td>
+                              </tr>
+
+                              {/* ── Sub-row 2: IN ── */}
+                              <tr className="hover:bg-slate-50/70 transition-colors bg-emerald-50/15">
+                                <td className="sticky left-0 z-20 bg-emerald-50/80 px-4 py-2 text-center font-extrabold text-[11px] text-emerald-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                  IN
+                                </td>
+                                {item.daily.map((d) => (
+                                  <td
+                                    key={d.dayNum}
+                                    className={`px-2 py-2 text-center font-mono text-xs border-r border-slate-100 ${
+                                      d.inQty > 0
+                                        ? 'font-bold text-emerald-700 bg-emerald-100/50'
+                                        : 'text-slate-400'
+                                    } ${d.isToday ? 'border-amber-300' : ''}`}
+                                  >
+                                    {d.inQty > 0 ? formatNumber(d.inQty) : 0}
+                                  </td>
+                                ))}
+                                <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-emerald-50 text-emerald-700">
+                                  +{formatNumber(item.totalIn)}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  —
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  —
+                                </td>
+                              </tr>
+
+                              {/* ── Sub-row 3: OUT ── */}
+                              <tr className="hover:bg-slate-50/70 transition-colors bg-rose-50/15">
+                                <td className="sticky left-0 z-20 bg-rose-50/80 px-4 py-2 text-center font-extrabold text-[11px] text-rose-700 uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                  OUT
+                                </td>
+                                {item.daily.map((d) => (
+                                  <td
+                                    key={d.dayNum}
+                                    className={`px-2 py-2 text-center font-mono text-xs border-r border-slate-100 ${
+                                      d.outQty > 0
+                                        ? 'font-bold text-rose-700 bg-rose-100/50'
+                                        : 'text-slate-400'
+                                    } ${d.isToday ? 'border-amber-300' : ''}`}
+                                  >
+                                    {d.outQty > 0 ? formatNumber(d.outQty) : 0}
+                                  </td>
+                                ))}
+                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  —
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono font-bold text-xs border-l border-slate-200 bg-rose-50 text-rose-700">
+                                  -{formatNumber(item.totalOut)}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  —
+                                </td>
+                              </tr>
+
+                              {/* ── Sub-row 4: SISA (BOLD BLUE AS IN SCREENSHOT) ── */}
+                              <tr className="hover:bg-blue-50/30 transition-colors bg-blue-50/10 border-b-2 border-slate-300">
+                                <td className="sticky left-0 z-20 bg-blue-50/90 px-4 py-2 text-center font-extrabold text-[11px] text-[#2563eb] uppercase tracking-wider border-r border-slate-200 shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
+                                  SISA
+                                </td>
+                                {item.daily.map((d) => (
+                                  <td
+                                    key={d.dayNum}
+                                    className={`px-2 py-2 text-center font-mono font-bold text-xs border-r border-slate-100 ${
+                                      d.sisa < 0
+                                        ? 'text-rose-600 bg-rose-100'
+                                        : 'text-[#2563eb]'
+                                    } ${d.isToday ? 'bg-amber-50/60' : ''}`}
+                                  >
+                                    {formatNumber(d.sisa)}
+                                  </td>
+                                ))}
+                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  —
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-xs border-l border-slate-200 bg-slate-50 text-slate-400">
+                                  —
+                                </td>
+                                <td className={`px-3 py-2 text-right font-mono font-extrabold text-xs border-l border-slate-200 ${item.finalSisa < 0 ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  {formatNumber(item.finalSisa)}
+                                </td>
+                              </tr>
+                            </React.Fragment>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                /* ── LIST VIEW (Daftar Transaksi Mutasi) ── */
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="relative">
+                        <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
+                        <input
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder="Cari transaksi atau part..."
+                          className="w-64 rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-[#eab308]"
+                        />
+                      </div>
+                      <select
+                        value={lineFilter}
+                        onChange={(e) => setLineFilter(e.target.value)}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 outline-none"
+                      >
+                        <option value="All lines">Semua Line</option>
+                        {availableLines.map((l) => (
+                          <option key={l} value={l}>
+                            Line {l}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={movementTypeFilter}
+                        onChange={(e) => setMovementTypeFilter(e.target.value as 'ALL' | 'IN' | 'OUT')}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 outline-none"
+                      >
+                        <option value="ALL">Semua Tipe (IN & OUT)</option>
+                        <option value="IN">🟢 Barang Masuk (IN)</option>
+                        <option value="OUT">🔴 Barang Keluar (OUT)</option>
+                      </select>
+                    </div>
+                    <span className="text-xs text-slate-400">Total: {visibleMovements.length} transaksi</span>
+                  </div>
+                  <MovementTable
+                    movements={visibleMovements}
+                    parts={parts}
+                    onDelete={handleDeleteMovement}
+                    onAddNew={handleOpenMovementForm}
+                    onEdit={handleEditMovement}
+                  />
+                </div>
+              )}
             </>
           )}
 
