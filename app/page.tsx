@@ -1561,11 +1561,15 @@ export default function Page() {
                                   {item.daily.map((d) => (
                                     <td
                                       key={d.dayNum}
-                                      className={`px-2 py-2 text-center font-mono text-xs border-r border-slate-100 ${
-                                        d.inQty > 0
-                                          ? 'font-bold text-emerald-700 bg-emerald-100/50'
-                                          : 'text-slate-400'
-                                      } ${d.isToday ? 'border-amber-300' : ''}`}
+                                      className={`px-2 py-2 text-center font-mono text-xs border-r ${
+                                        d.isToday
+                                          ? d.inQty > 0
+                                            ? 'font-bold text-emerald-800 bg-amber-200/70 border-amber-400 ring-1 ring-inset ring-amber-300'
+                                            : 'text-slate-500 bg-amber-100/60 border-amber-300'
+                                          : d.inQty > 0
+                                          ? 'font-bold text-emerald-700 bg-emerald-100/50 border-slate-100'
+                                          : 'text-slate-400 border-slate-100'
+                                      }`}
                                     >
                                       {d.inQty > 0 ? formatNumber(d.inQty) : 0}
                                     </td>
@@ -1589,11 +1593,15 @@ export default function Page() {
                                   {item.daily.map((d) => (
                                     <td
                                       key={d.dayNum}
-                                      className={`px-2 py-2 text-center font-mono text-xs border-r border-slate-100 ${
-                                        d.outQty > 0
-                                          ? 'font-bold text-rose-700 bg-rose-100/50'
-                                          : 'text-slate-400'
-                                      } ${d.isToday ? 'border-amber-300' : ''}`}
+                                      className={`px-2 py-2 text-center font-mono text-xs border-r ${
+                                        d.isToday
+                                          ? d.outQty > 0
+                                            ? 'font-bold text-rose-800 bg-amber-200/70 border-amber-400 ring-1 ring-inset ring-amber-300'
+                                            : 'text-slate-500 bg-amber-100/60 border-amber-300'
+                                          : d.outQty > 0
+                                          ? 'font-bold text-rose-700 bg-rose-100/50 border-slate-100'
+                                          : 'text-slate-400 border-slate-100'
+                                      }`}
                                     >
                                       {d.outQty > 0 ? formatNumber(d.outQty) : 0}
                                     </td>
@@ -1617,11 +1625,15 @@ export default function Page() {
                                   {item.daily.map((d) => (
                                     <td
                                       key={d.dayNum}
-                                      className={`px-2 py-2 text-center font-mono font-bold text-xs border-r border-slate-100 ${
-                                        d.sisa < 0
-                                          ? 'text-rose-600 bg-rose-100'
-                                          : 'text-[#2563eb]'
-                                      } ${d.isToday ? 'bg-amber-50/60' : ''}`}
+                                      className={`px-2 py-2 text-center font-mono font-bold text-xs border-r ${
+                                        d.isToday
+                                          ? d.sisa < 0
+                                            ? 'text-rose-700 bg-amber-300/80 border-amber-500 ring-1 ring-inset ring-amber-400'
+                                            : 'text-amber-900 bg-amber-300/90 border-amber-500 ring-1 ring-inset ring-amber-400'
+                                          : d.sisa < 0
+                                          ? 'text-rose-600 bg-rose-100 border-slate-100'
+                                          : 'text-[#2563eb] border-slate-100'
+                                      }`}
                                     >
                                       {formatNumber(d.sisa)}
                                     </td>
