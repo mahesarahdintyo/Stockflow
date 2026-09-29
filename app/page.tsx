@@ -21,6 +21,7 @@ import {
   FileSpreadsheet,
   Filter,
   History,
+  Laptop,
   LayoutDashboard,
   Lock,
   Maximize2,
@@ -217,6 +218,8 @@ export default function Page() {
 
   // Theme state: 'light' | 'dark' | 'system' — pola PKIS-PLUS
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+  // isDark sebagai state — SSR selalu false, update setelah mount (hindari hydration mismatch)
+  const [isDark, setIsDark] = useState(false)
 
   function applyThemeToDOM(t: 'light' | 'dark' | 'system') {
     const html = document.documentElement
@@ -229,6 +232,7 @@ export default function Page() {
       html.classList.add('light')
       html.classList.remove('dark')
     }
+    setIsDark(effectiveDark)
   }
 
   useEffect(() => {
@@ -239,6 +243,37 @@ export default function Page() {
       applyThemeToDOM(initial)
     } catch {
       applyThemeToDOM('system')
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleSystemThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      const stored = localStorage.getItem('stockflow.theme') as 'light' | 'dark' | 'system' | null
+      if (stored === 'system' || !stored) {
+        const html = document.documentElement
+        if (e.matches) {
+          html.classList.add('dark')
+          html.classList.remove('light')
+          setIsDark(true)
+        } else {
+          html.classList.add('light')
+          html.classList.remove('dark')
+          setIsDark(false)
+        }
+      }
+    }
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleSystemThemeChange)
+    } else if ((mediaQuery as any).addListener) {
+      ;(mediaQuery as any).addListener(handleSystemThemeChange)
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handleSystemThemeChange)
+      } else if ((mediaQuery as any).removeListener) {
+        ;(mediaQuery as any).removeListener(handleSystemThemeChange)
+      }
     }
   }, [])
 
@@ -254,9 +289,6 @@ export default function Page() {
       return next
     })
   }
-
-  // Derived: effective dark flag — dipakai untuk conditional inline styling
-  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   // Fullscreen TV 52" mode
   const [isTvFullscreen, setIsTvFullscreen] = useState(false)
@@ -1069,7 +1101,7 @@ export default function Page() {
               ) : theme === 'light' ? (
                 <><Sun size={15} /><span className="hidden sm:inline">Terang</span></>
               ) : (
-                <><Sun size={15} className="opacity-60" /><span className="hidden sm:inline">Sistem</span></>
+                <><Laptop size={15} /><span className="hidden sm:inline">Sistem</span></>
               )}
             </button>
 
@@ -1133,7 +1165,7 @@ export default function Page() {
                     onClick={handleOpenMovementForm}
                     className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold text-white shadow-sm transition"
                     style={{ backgroundColor: 'var(--sf-sidebar-bg)' }}
-                    onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = theme === 'dark' ? '#2c3945' : '#0f766e')}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = isDark ? '#2c3945' : '#0f766e')}
                     onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--sf-sidebar-bg)')}
                   >
                     <Plus size={16} /> Input Pergerakan
@@ -1230,7 +1262,7 @@ export default function Page() {
                   </div>
                   <div
                     className="m-5 rounded-lg p-3.5 text-xs border"
-                    style={theme === 'dark'
+                    style={isDark
                       ? { background: 'rgba(244,196,48,0.06)', borderColor: 'rgba(244,196,48,0.18)', color: '#d4a017' }
                       : { background: '#f0fdfa', borderColor: '#99f6e4', color: '#0f766e' }
                     }
@@ -1271,7 +1303,7 @@ export default function Page() {
                       onClick={handleOpenPartForm}
                       className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white transition"
                       style={{ backgroundColor: 'var(--sf-sidebar-bg)' }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = theme === 'dark' ? '#2c3945' : '#0f766e')}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = isDark ? '#2c3945' : '#0f766e')}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--sf-sidebar-bg)')}
                     >
                       <Plus size={14} /> Tambah Part
@@ -1299,7 +1331,7 @@ export default function Page() {
               className={
                 isTvFullscreen
                   ? `fixed inset-0 z-50 flex flex-col h-screen overflow-hidden p-2 sm:p-3 transition-colors duration-200 ${
-                      theme === 'dark' ? 'text-slate-100' : 'text-slate-900'
+                      isDark ? 'text-slate-100' : 'text-slate-900'
                     }`
                   : 'relative tab-fade-in'
               }
@@ -1309,7 +1341,7 @@ export default function Page() {
               {isTvFullscreen ? (
                 <div
                   className={`mb-2 flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-1.5 rounded-xl shadow-xl shrink-0 border transition-colors ${
-                    theme === 'dark'
+                    isDark
                       ? 'bg-slate-900/95 border-slate-700/80 text-white'
                       : 'bg-white border-slate-300 text-slate-800 shadow-md'
                   }`}
@@ -1332,18 +1364,18 @@ export default function Page() {
                   <div className="flex items-center gap-2">
                     <div
                       className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border ${
-                        theme === 'dark' ? 'bg-slate-950/90 border-slate-700' : 'bg-slate-50 border-slate-300'
+                        isDark ? 'bg-slate-950/90 border-slate-700' : 'bg-slate-50 border-slate-300'
                       }`}
                     >
                       <ArrowUpDown size={13} className="text-amber-500" />
-                      <span className={`text-[11px] font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                      <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                         Sortir:
                       </span>
                       <select
                         value={monthlySortField}
                         onChange={(e) => setMonthlySortField(e.target.value as MonthlySortField)}
                         className={`h-7 rounded px-2 text-xs font-semibold outline-none cursor-pointer border ${
-                          theme === 'dark'
+                          isDark
                             ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
                             : 'bg-white border-slate-300 text-slate-800 focus:border-teal-500'
                         }`}
@@ -1362,7 +1394,7 @@ export default function Page() {
                         onClick={() => setMonthlySortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
                         title={monthlySortDir === 'asc' ? 'Urutan: Naik (A-Z / Terkecil)' : 'Urutan: Turun (Z-A / Terbesar)'}
                         className={`h-7 px-2 rounded border text-xs font-bold flex items-center gap-1 transition active:scale-95 ${
-                          theme === 'dark'
+                          isDark
                             ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700'
                             : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
                         }`}
@@ -1374,17 +1406,17 @@ export default function Page() {
                     {/* Quick Line filter for TV */}
                     <div
                       className={`hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg border ${
-                        theme === 'dark' ? 'bg-slate-950/90 border-slate-700' : 'bg-slate-50 border-slate-300'
+                        isDark ? 'bg-slate-950/90 border-slate-700' : 'bg-slate-50 border-slate-300'
                       }`}
                     >
-                      <span className={`text-[11px] font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         Line:
                       </span>
                       <select
                         value={monthlyLineFilter}
                         onChange={(e) => setMonthlyLineFilter(e.target.value)}
                         className={`h-7 rounded px-2 text-xs font-semibold outline-none cursor-pointer border ${
-                          theme === 'dark'
+                          isDark
                             ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
                             : 'bg-white border-slate-300 text-slate-800 focus:border-teal-500'
                         }`}
@@ -1403,7 +1435,7 @@ export default function Page() {
                   <div className="flex items-center gap-2">
                     <div
                       className={`hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-lg border ${
-                        theme === 'dark' ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-50 border-slate-300'
+                        isDark ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-50 border-slate-300'
                       }`}
                     >
                       <Clock size={13} className="text-amber-500 animate-pulse" />
@@ -1417,15 +1449,26 @@ export default function Page() {
                     <button
                       type="button"
                       onClick={toggleTheme}
-                      title={theme === 'dark' ? 'Ganti ke Mode Terang (Light Mode)' : 'Ganti ke Mode Gelap (Dark Mode)'}
+                      title={
+                        theme === 'system'
+                          ? 'Mode Sistem — klik untuk Mode Terang'
+                          : theme === 'light'
+                          ? 'Mode Terang — klik untuk Mode Gelap'
+                          : 'Mode Gelap — klik untuk Mode Sistem'
+                      }
                       className={`h-8 px-2.5 rounded-lg border font-bold text-xs flex items-center gap-1.5 transition active:scale-95 ${
-                        theme === 'dark'
+                        isDark
                           ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700'
                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
                       }`}
                     >
-                      {theme === 'dark' ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-teal-600" />}
-                      <span className="hidden sm:inline">{theme === 'dark' ? 'Terang' : 'Gelap'}</span>
+                      {theme === 'dark' ? (
+                        <><Moon size={14} className="text-amber-400" /><span className="hidden sm:inline">Gelap</span></>
+                      ) : theme === 'light' ? (
+                        <><Sun size={14} className="text-amber-500" /><span className="hidden sm:inline">Terang</span></>
+                      ) : (
+                        <><Laptop size={14} className={isDark ? 'text-amber-300' : 'text-slate-500'} /><span className="hidden sm:inline">Sistem</span></>
+                      )}
                     </button>
 
                     <button
@@ -1504,7 +1547,7 @@ export default function Page() {
                       className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold shadow-sm transition active:scale-95"
                       style={{
                         backgroundColor: 'var(--sf-brand)',
-                        color: theme === 'dark' ? '#17202b' : '#ffffff',
+                        color: isDark ? '#17202b' : '#ffffff',
                       }}
                     >
                       <Plus size={16} /> Input Mutasi
@@ -1750,7 +1793,7 @@ export default function Page() {
                 <div
                   className={`rounded-2xl border shadow-md overflow-hidden flex flex-col transition-colors ${
                     isTvFullscreen
-                      ? theme === 'dark'
+                      ? isDark
                         ? 'border-slate-700 bg-slate-950 flex-1 min-h-0'
                         : 'border-slate-300 bg-white flex-1 min-h-0'
                       : 'border-slate-300 bg-white dark:border-slate-800 dark:bg-slate-900'
@@ -1798,7 +1841,7 @@ export default function Page() {
                                 key={dayNum}
                                 className={`sticky top-0 z-30 px-2 py-3 text-center min-w-[58px] border-r border-slate-700/60 transition ${
                                   isToday
-                                    ? theme === 'light'
+                                    ? !isDark
                                       ? 'bg-teal-900/60 text-teal-200 border-t-2 border-t-teal-400'
                                       : 'bg-amber-950/80 text-[#f4c430] border-t-2 border-t-[#f4c430]'
                                     : isWeekend
@@ -2281,7 +2324,7 @@ export default function Page() {
 
           {/* RIWAYAT PAGE */}
           {activePage === 'Riwayat' && (
-            <div className={`riwayat-fade-in ${theme === 'light' ? 'light-riwayat' : ''}`} style={{ minHeight: '80vh' }}>
+            <div className={`riwayat-fade-in ${!isDark ? 'light-riwayat' : ''}`} style={{ minHeight: '80vh' }}>
               {/* Page Hero Header */}
               <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -2290,12 +2333,12 @@ export default function Page() {
                       className="flex h-9 w-9 items-center justify-center rounded-xl shadow-xs"
                       style={{
                         background:
-                          theme === 'light'
+                          !isDark
                             ? 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)'
                             : 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)',
                       }}
                     >
-                      <History size={18} className={theme === 'light' ? 'text-white' : 'text-[#202932]'} />
+                      <History size={18} className={!isDark ? 'text-white' : 'text-[#202932]'} />
                     </div>
                     <div>
                       <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Stockflow / Riwayat</p>
@@ -2308,14 +2351,14 @@ export default function Page() {
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
                     style={{
-                      background: theme === 'light' ? 'rgba(13,148,136,0.1)' : 'rgba(244,196,48,0.1)',
-                      color: theme === 'light' ? '#0d9488' : '#f4c430',
-                      border: theme === 'light' ? '1px solid rgba(13,148,136,0.2)' : '1px solid rgba(244,196,48,0.2)',
+                      background: !isDark ? 'rgba(13,148,136,0.1)' : 'rgba(244,196,48,0.1)',
+                      color: !isDark ? '#0d9488' : '#f4c430',
+                      border: !isDark ? '1px solid rgba(13,148,136,0.2)' : '1px solid rgba(244,196,48,0.2)',
                     }}
                   >
                     <span
                       className="h-1.5 w-1.5 rounded-full animate-pulse"
-                      style={{ background: theme === 'light' ? '#0d9488' : '#f4c430' }}
+                      style={{ background: !isDark ? '#0d9488' : '#f4c430' }}
                     />
                     {riwayatFiltered.length} transaksi ditemukan
                   </span>
@@ -2326,29 +2369,29 @@ export default function Page() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 {/* Total Transaksi */}
                 <div
-                  className={`rounded-2xl p-5 ${theme === 'light' ? 'stat-glow-teal bg-white border border-teal-100 shadow-sm' : 'stat-glow-yellow'}`}
-                  style={theme === 'dark' ? { background: 'linear-gradient(135deg, #202932 0%, #263240 100%)', border: '1px solid rgba(244,196,48,0.15)' } : {}}
+                  className={`rounded-2xl p-5 ${!isDark ? 'stat-glow-teal bg-white border border-teal-100 shadow-sm' : 'stat-glow-yellow'}`}
+                  style={isDark ? { background: 'linear-gradient(135deg, #202932 0%, #263240 100%)', border: '1px solid rgba(244,196,48,0.15)' } : {}}
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs font-semibold mb-3 text-slate-400 dark:text-white/40">TOTAL TRANSAKSI</p>
-                      <p className="text-3xl font-bold" style={{ color: theme === 'light' ? '#0d9488' : '#f4c430' }}>
+                      <p className="text-3xl font-bold" style={{ color: !isDark ? '#0d9488' : '#f4c430' }}>
                         {formatNumber(riwayatFiltered.length)}
                       </p>
                       <p className="text-[11px] mt-1 text-slate-400 dark:text-white/30">dalam rentang tanggal dipilih</p>
                     </div>
                     <div
                       className="rounded-xl p-2.5"
-                      style={{ background: theme === 'light' ? 'rgba(13,148,136,0.1)' : 'rgba(244,196,48,0.1)' }}
+                      style={{ background: !isDark ? 'rgba(13,148,136,0.1)' : 'rgba(244,196,48,0.1)' }}
                     >
-                      <History size={20} style={{ color: theme === 'light' ? '#0d9488' : '#f4c430' }} />
+                      <History size={20} style={{ color: !isDark ? '#0d9488' : '#f4c430' }} />
                     </div>
                   </div>
                 </div>
                 {/* Transaksi Masuk */}
                 <div
-                  className={`rounded-2xl p-5 ${theme === 'light' ? 'bg-white border border-emerald-100 shadow-sm' : 'stat-glow-green'}`}
-                  style={theme === 'dark' ? { background: 'linear-gradient(135deg, #1a2920 0%, #1e3125 100%)', border: '1px solid rgba(74,222,128,0.12)' } : {}}
+                  className={`rounded-2xl p-5 ${!isDark ? 'bg-white border border-emerald-100 shadow-sm' : 'stat-glow-green'}`}
+                  style={isDark ? { background: 'linear-gradient(135deg, #1a2920 0%, #1e3125 100%)', border: '1px solid rgba(74,222,128,0.12)' } : {}}
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -2367,8 +2410,8 @@ export default function Page() {
                 </div>
                 {/* Transaksi Keluar */}
                 <div
-                  className={`rounded-2xl p-5 ${theme === 'light' ? 'bg-white border border-rose-100 shadow-sm' : 'stat-glow-blue'}`}
-                  style={theme === 'dark' ? { background: 'linear-gradient(135deg, #201a1a 0%, #291e1e 100%)', border: '1px solid rgba(248,113,113,0.12)' } : {}}
+                  className={`rounded-2xl p-5 ${!isDark ? 'bg-white border border-rose-100 shadow-sm' : 'stat-glow-blue'}`}
+                  style={isDark ? { background: 'linear-gradient(135deg, #201a1a 0%, #291e1e 100%)', border: '1px solid rgba(248,113,113,0.12)' } : {}}
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -2391,7 +2434,7 @@ export default function Page() {
               <div
                 className="rounded-2xl overflow-hidden transition-colors"
                 style={
-                  theme === 'light'
+                  !isDark
                     ? { background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }
                     : { background: '#202932', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }
                 }
@@ -2400,7 +2443,7 @@ export default function Page() {
                 <div
                   className="p-5 transition-colors"
                   style={
-                    theme === 'light'
+                    !isDark
                       ? { borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }
                       : { borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }
                   }
@@ -2409,7 +2452,7 @@ export default function Page() {
                   <div
                     className="mb-3.5 flex flex-wrap items-center gap-1.5 pb-3"
                     style={{
-                      borderBottom: theme === 'light' ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.05)',
+                      borderBottom: !isDark ? '1px solid #e2e8f0' : '1px solid rgba(255,255,255,0.05)',
                     }}
                   >
                     <span className="text-[10px] font-bold uppercase tracking-widest mr-1 text-slate-500 dark:text-white/40">
@@ -2470,10 +2513,10 @@ export default function Page() {
                           }}
                           className={`text-xs px-3 py-1.5 rounded-xl font-bold transition active:scale-95 ${
                             isActive
-                              ? theme === 'light'
+                              ? !isDark
                                 ? 'bg-teal-600 text-white shadow-sm'
                                 : 'bg-[#f4c430] text-[#202932] shadow-sm'
-                              : theme === 'light'
+                              : !isDark
                               ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
                               : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
                           }`}
@@ -2547,7 +2590,7 @@ export default function Page() {
                       <div
                         className="flex items-center gap-1 rounded-xl p-1"
                         style={
-                          theme === 'light'
+                          !isDark
                             ? { background: '#f1f5f9', border: '1px solid #cbd5e1' }
                             : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }
                         }
@@ -2557,10 +2600,10 @@ export default function Page() {
                           onClick={() => { setRiwayatTypeFilter('ALL'); setRiwayatPage(1) }}
                           className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
                             riwayatTypeFilter === 'ALL'
-                              ? theme === 'light'
+                              ? !isDark
                                 ? 'bg-teal-600 text-white shadow-sm'
                                 : 'bg-[#f4c430] text-[#202932] shadow-sm'
-                              : theme === 'light'
+                              : !isDark
                               ? 'text-slate-600 hover:text-slate-900'
                               : 'text-slate-400 hover:text-white'
                           }`}
@@ -2617,7 +2660,7 @@ export default function Page() {
                         onClick={handleRiwayatSearch}
                         className="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition active:scale-95"
                         style={
-                          theme === 'light'
+                          !isDark
                             ? { background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', color: '#ffffff' }
                             : { background: 'linear-gradient(135deg, #f4c430 0%, #d4a017 100%)', color: '#202932' }
                         }
@@ -2630,7 +2673,7 @@ export default function Page() {
                         onClick={handleRiwayatReset}
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition active:scale-95"
                         style={
-                          theme === 'light'
+                          !isDark
                             ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' }
                             : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.08)' }
                         }
@@ -2646,9 +2689,9 @@ export default function Page() {
                   <div className="flex flex-col items-center justify-center py-20 gap-4">
                     <div
                       className="rounded-2xl p-5"
-                      style={{ background: theme === 'light' ? '#f0fdfa' : 'rgba(255,255,255,0.04)' }}
+                      style={{ background: !isDark ? '#f0fdfa' : 'rgba(255,255,255,0.04)' }}
                     >
-                      <History size={36} style={{ color: theme === 'light' ? '#0d9488' : 'rgba(255,255,255,0.15)' }} />
+                      <History size={36} style={{ color: !isDark ? '#0d9488' : 'rgba(255,255,255,0.15)' }} />
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-semibold text-slate-600 dark:text-white/40">Tidak ada transaksi ditemukan</p>
@@ -2658,7 +2701,7 @@ export default function Page() {
                       onClick={handleRiwayatReset}
                       className="text-xs font-bold px-4 py-2 rounded-xl transition"
                       style={
-                        theme === 'light'
+                        !isDark
                           ? { color: '#0d9488', background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.2)' }
                           : { color: '#f4c430', background: 'rgba(244,196,48,0.08)', border: '1px solid rgba(244,196,48,0.15)' }
                       }
@@ -2681,7 +2724,7 @@ export default function Page() {
                       <div
                         className="flex items-center justify-between px-5 py-4"
                         style={{
-                          borderTop: theme === 'light' ? '1px solid #f1f5f9' : '1px solid rgba(255,255,255,0.05)',
+                          borderTop: !isDark ? '1px solid #f1f5f9' : '1px solid rgba(255,255,255,0.05)',
                         }}
                       >
                         <p className="text-xs text-slate-500 dark:text-white/30">
@@ -2695,7 +2738,7 @@ export default function Page() {
                             disabled={riwayatPage === 1}
                             className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition disabled:opacity-30 active:scale-95"
                             style={
-                              theme === 'light'
+                              !isDark
                                 ? { background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1' }
                                 : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
                             }
@@ -2712,10 +2755,10 @@ export default function Page() {
                                 className="w-8 h-8 rounded-xl text-xs font-bold transition active:scale-95"
                                 style={
                                   page === riwayatPage
-                                    ? theme === 'light'
+                                    ? !isDark
                                       ? { background: '#0d9488', color: '#ffffff' }
                                       : { background: '#f4c430', color: '#202932' }
-                                    : theme === 'light'
+                                    : !isDark
                                     ? { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }
                                     : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.07)' }
                                 }
@@ -2730,7 +2773,7 @@ export default function Page() {
                             disabled={riwayatPage === riwayatTotalPages}
                             className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition disabled:opacity-30 active:scale-95"
                             style={
-                              theme === 'light'
+                              !isDark
                                 ? { background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1' }
                                 : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
                             }
@@ -2755,7 +2798,7 @@ export default function Page() {
           title="Input Pergerakan Cepat"
           className="flex items-center gap-2.5 rounded-2xl px-4 py-3.5 text-xs sm:text-sm font-bold shadow-2xl hover:scale-105 active:scale-95 transition-all duration-150 border"
           style={
-            theme === 'light'
+            !isDark
               ? {
                   background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
                   color: '#ffffff',
@@ -2773,7 +2816,7 @@ export default function Page() {
           <div
             className="flex h-6 w-6 items-center justify-center rounded-lg"
             style={{
-              background: theme === 'light' ? 'rgba(255,255,255,0.2)' : '#202932',
+              background: !isDark ? 'rgba(255,255,255,0.2)' : '#202932',
               color: '#ffffff',
             }}
           >
