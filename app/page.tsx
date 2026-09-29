@@ -2702,19 +2702,19 @@ export default function Page() {
         </div>
       )}
 
-      {/* POPUP ANALOG CLOCK TIME PICKER MODAL (MATERIAL DESIGN) */}
+      {/* POPUP ANALOG CLOCK TIME PICKER MODAL (MATERIAL DESIGN - TOUCH OPTIMIZED) */}
       {showTimePicker && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 animate-in fade-in duration-150"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-150 overflow-y-auto"
           onClick={() => setShowTimePicker(false)}
         >
           <div
-            className="w-full max-w-[430px] rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col sm:flex-row animate-in zoom-in-95 duration-150 border border-slate-100"
+            className="w-full max-w-[540px] rounded-3xl bg-white shadow-2xl overflow-hidden flex flex-col sm:flex-row animate-in zoom-in-95 duration-150 border border-slate-100 my-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Left Sidebar: Teal Header Display */}
-            <div className="bg-[#00897b] text-white p-5 flex flex-row sm:flex-col items-center justify-between sm:justify-center sm:w-[130px] shrink-0">
-              <div className="text-[10px] font-extrabold uppercase tracking-widest text-teal-200/90 mb-1 sm:mb-4 hidden sm:block">
+            <div className="bg-[#00897b] text-white p-5 sm:p-6 flex flex-row sm:flex-col items-center justify-between sm:justify-center sm:w-[150px] shrink-0">
+              <div className="text-[11px] font-extrabold uppercase tracking-widest text-teal-200/90 mb-1 sm:mb-5 hidden sm:block">
                 WAKTU
               </div>
 
@@ -2723,24 +2723,24 @@ export default function Page() {
                 <button
                   type="button"
                   onClick={() => setClockMode('hours')}
-                  className={`font-mono text-4xl sm:text-5xl font-black leading-none transition cursor-pointer p-1 rounded-lg ${
+                  className={`font-mono text-5xl sm:text-6xl font-black leading-none transition cursor-pointer p-1.5 rounded-xl ${
                     clockMode === 'hours'
-                      ? 'text-white scale-105 drop-shadow'
+                      ? 'text-white scale-105 drop-shadow-md'
                       : 'text-teal-200/70 hover:text-white'
                   }`}
                   title="Pilih Jam"
                 >
                   {String(selectedH12).padStart(2, '0')}
                 </button>
-                <span className="font-mono text-3xl sm:text-4xl text-teal-200/60 my-0.5 mx-1 sm:mx-0 select-none">
+                <span className="font-mono text-4xl sm:text-5xl text-teal-200/60 my-0.5 mx-1.5 sm:mx-0 select-none">
                   :
                 </span>
                 <button
                   type="button"
                   onClick={() => setClockMode('minutes')}
-                  className={`font-mono text-4xl sm:text-5xl font-black leading-none transition cursor-pointer p-1 rounded-lg ${
+                  className={`font-mono text-5xl sm:text-6xl font-black leading-none transition cursor-pointer p-1.5 rounded-xl ${
                     clockMode === 'minutes'
-                      ? 'text-white scale-105 drop-shadow'
+                      ? 'text-white scale-105 drop-shadow-md'
                       : 'text-teal-200/70 hover:text-white'
                   }`}
                   title="Pilih Menit"
@@ -2750,14 +2750,14 @@ export default function Page() {
               </div>
 
               {/* AM / PM Toggle */}
-              <div className="flex sm:flex-col gap-1.5 sm:mt-5 sm:w-full">
+              <div className="flex sm:flex-col gap-2 sm:mt-6 sm:w-full">
                 <button
                   type="button"
                   onClick={() => setPeriod('AM')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition cursor-pointer active:scale-95 ${
                     period === 'AM'
-                      ? 'bg-white text-[#00897b] font-extrabold shadow-md'
-                      : 'text-teal-100 hover:bg-teal-700/60'
+                      ? 'bg-white text-[#00897b] shadow-md'
+                      : 'text-teal-100 hover:bg-teal-700/60 font-bold'
                   }`}
                 >
                   AM
@@ -2765,10 +2765,10 @@ export default function Page() {
                 <button
                   type="button"
                   onClick={() => setPeriod('PM')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition cursor-pointer active:scale-95 ${
                     period === 'PM'
-                      ? 'bg-white text-[#00897b] font-extrabold shadow-md'
-                      : 'text-teal-100 hover:bg-teal-700/60'
+                      ? 'bg-white text-[#00897b] shadow-md'
+                      : 'text-teal-100 hover:bg-teal-700/60 font-bold'
                   }`}
                 >
                   PM
@@ -2776,21 +2776,21 @@ export default function Page() {
               </div>
 
               {/* 24h helper */}
-              <div className="hidden sm:block text-[10px] font-mono text-teal-100 font-semibold mt-4 text-center">
+              <div className="hidden sm:block text-xs font-mono text-teal-100 font-bold mt-5 text-center bg-teal-800/40 px-2.5 py-1 rounded-lg">
                 24H: {preview24}
               </div>
             </div>
 
             {/* Right Section: Circular Dial Face & Actions */}
-            <div className="flex-1 p-4 sm:p-5 flex flex-col items-center justify-between bg-white">
+            <div className="flex-1 min-w-0 p-4 sm:p-6 flex flex-col items-center justify-between bg-white">
               {/* Mode Indicator Tabs */}
               <div className="flex items-center gap-2 mb-3">
                 <button
                   type="button"
                   onClick={() => setClockMode('hours')}
-                  className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
                     clockMode === 'hours'
-                      ? 'bg-teal-50 text-[#00897b] border border-teal-200'
+                      ? 'bg-teal-50 text-[#00897b] border border-teal-200 shadow-2xs'
                       : 'text-slate-400 hover:text-slate-600'
                   }`}
                 >
@@ -2800,17 +2800,17 @@ export default function Page() {
                 <button
                   type="button"
                   onClick={() => setClockMode('minutes')}
-                  className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
                     clockMode === 'minutes'
-                      ? 'bg-teal-50 text-[#00897b] border border-teal-200'
+                      ? 'bg-teal-50 text-[#00897b] border border-teal-200 shadow-2xs'
                       : 'text-slate-400 hover:text-slate-600'
                   }`}
                 >
-                  Menit (00 - 55)
+                  Menit (00 - 59)
                 </button>
               </div>
 
-              {/* Analog Clock Dial (250px x 250px) */}
+              {/* Analog Clock Dial (280px x 280px - Touch Optimized) */}
               <div
                 ref={dialRef}
                 onPointerDown={(e) => {
@@ -2828,40 +2828,40 @@ export default function Page() {
                     setTimeout(() => setClockMode('minutes'), 180)
                   }
                 }}
-                className="relative w-[250px] h-[250px] rounded-full bg-slate-100/90 select-none cursor-pointer touch-none shadow-inner border border-slate-200/50"
+                className="relative w-[280px] h-[280px] rounded-full bg-slate-100/90 select-none cursor-pointer touch-none shadow-inner border border-slate-200/60"
               >
                 {/* Center Pivot Dot */}
-                <div className="absolute left-[125px] top-[125px] w-2.5 h-2.5 rounded-full bg-[#00897b] -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none" />
+                <div className="absolute left-[140px] top-[140px] w-3 h-3 rounded-full bg-[#00897b] -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none shadow-2xs" />
 
                 {/* Hand Stem Line & Indicator Thumb */}
                 <div
-                  className="absolute left-[125px] top-[125px] pointer-events-none transition-transform duration-100 ease-out z-10"
+                  className="absolute left-[140px] top-[140px] pointer-events-none transition-transform duration-100 ease-out z-10"
                   style={{
                     transform: `rotate(${handAngle}deg)`,
                     transformOrigin: '0 0',
                   }}
                 >
-                  {/* Stem Line from center up to -92px */}
+                  {/* Stem Line from center up to -105px */}
                   <div
                     className="absolute bg-[#00897b] -translate-x-1/2"
                     style={{
                       left: '0px',
                       bottom: '0px',
                       width: '2px',
-                      height: '92px',
+                      height: '105px',
                     }}
                   />
-                  {/* Teal circle thumb at tip (-92px) */}
+                  {/* Teal circle thumb at tip (-105px) */}
                   <div
-                    className="absolute rounded-full bg-[#00897b] flex items-center justify-center -translate-x-1/2 -translate-y-1/2 shadow-md"
+                    className="absolute rounded-full bg-[#00897b] flex items-center justify-center -translate-x-1/2 -translate-y-1/2 shadow-md ring-2 ring-white/40"
                     style={{
                       left: '0px',
-                      top: '-92px',
-                      width: '34px',
-                      height: '34px',
+                      top: '-105px',
+                      width: '38px',
+                      height: '38px',
                     }}
                   >
-                    <span className="text-white text-xs font-mono font-bold select-none">
+                    <span className="text-white text-sm font-mono font-black select-none">
                       {clockMode === 'hours'
                         ? selectedH12
                         : String(selectedMin).padStart(2, '0')}
@@ -2869,12 +2869,12 @@ export default function Page() {
                   </div>
                 </div>
 
-                {/* Numbers around the clock face */}
+                {/* Dial numbers & minute ticks */}
                 {clockMode === 'hours'
                   ? HOUR_DIAL_NUMBERS.map((num, i) => {
                       const rad = (i * 30 - 90) * (Math.PI / 180)
-                      const left = 125 + 92 * Math.cos(rad)
-                      const top = 125 + 92 * Math.sin(rad)
+                      const left = 140 + 105 * Math.cos(rad)
+                      const top = 140 + 105 * Math.sin(rad)
                       const isSelected = num === selectedH12
                       return (
                         <button
@@ -2889,7 +2889,7 @@ export default function Page() {
                             left: `${left}px`,
                             top: `${top}px`,
                           }}
-                          className={`absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center font-mono text-xs font-semibold z-20 transition cursor-pointer select-none ${
+                          className={`absolute w-9 h-9 -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center font-mono text-sm font-bold z-20 transition cursor-pointer select-none active:scale-95 ${
                             isSelected
                               ? 'opacity-0 pointer-events-none'
                               : 'text-slate-700 hover:text-[#00897b] hover:bg-teal-50'
@@ -2899,58 +2899,129 @@ export default function Page() {
                         </button>
                       )
                     })
-                  : MINUTE_DIAL_NUMBERS.map((numStr, i) => {
-                      const rad = (i * 30 - 90) * (Math.PI / 180)
-                      const left = 125 + 92 * Math.cos(rad)
-                      const top = 125 + 92 * Math.sin(rad)
-                      const val = parseInt(numStr, 10)
-                      const isSelected = val === selectedMin
+                  : Array.from({ length: 60 }, (_, m) => {
+                      const rad = (m * 6 - 90) * (Math.PI / 180)
+                      const left = 140 + 105 * Math.cos(rad)
+                      const top = 140 + 105 * Math.sin(rad)
+                      const isSelected = m === selectedMin
+
+                      if (m % 5 === 0) {
+                        const numStr = String(m).padStart(2, '0')
+                        return (
+                          <button
+                            key={`min-${m}`}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedMin(m)
+                            }}
+                            style={{
+                              left: `${left}px`,
+                              top: `${top}px`,
+                            }}
+                            className={`absolute w-9 h-9 -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center font-mono text-sm font-bold z-20 transition cursor-pointer select-none active:scale-95 ${
+                              isSelected
+                                ? 'opacity-0 pointer-events-none'
+                                : 'text-slate-700 hover:text-[#00897b] hover:bg-teal-50'
+                            }`}
+                          >
+                            {numStr}
+                          </button>
+                        )
+                      }
+
+                      // Intermediate minute tick dots (larger touch area for fingers)
                       return (
                         <button
-                          key={numStr}
+                          key={`tick-${m}`}
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            setSelectedMin(val)
+                            setSelectedMin(m)
                           }}
                           style={{
                             left: `${left}px`,
                             top: `${top}px`,
                           }}
-                          className={`absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center font-mono text-xs font-semibold z-20 transition cursor-pointer select-none ${
-                            isSelected
-                              ? 'opacity-0 pointer-events-none'
-                              : 'text-slate-700 hover:text-[#00897b] hover:bg-teal-50'
+                          className={`absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-20 cursor-pointer group active:scale-125 ${
+                            isSelected ? 'opacity-0 pointer-events-none' : ''
                           }`}
+                          title={`Menit ${String(m).padStart(2, '0')}`}
                         >
-                          {numStr}
+                          <div className="w-2 h-2 rounded-full bg-slate-300 group-hover:bg-[#00897b] group-hover:scale-150 transition-transform" />
                         </button>
                       )
                     })}
               </div>
 
-              {/* Bottom Action Buttons (CLEAR, CANCEL, OK) */}
-              <div className="w-full flex items-center justify-between pt-4 mt-2 border-t border-slate-100">
+              {/* Minute Fine-Tuning Bar (Touch-Friendly) */}
+              {clockMode === 'minutes' ? (
+                <div className="flex items-center justify-center gap-1.5 mt-3 bg-slate-50/90 px-3 py-2 rounded-2xl border border-slate-100 max-w-[320px] shadow-2xs">
+                  <span className="text-[11px] font-extrabold text-slate-400 mr-0.5">Presisi:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMin((prev) => (prev - 5 + 60) % 60)}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-700 bg-white hover:bg-slate-200 border border-slate-200 cursor-pointer active:scale-95 transition"
+                    title="Kurang 5 menit"
+                  >
+                    −5m
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMin((prev) => (prev - 1 + 60) % 60)}
+                    className="px-3 py-1 rounded-lg text-xs font-bold text-slate-700 bg-white hover:bg-slate-200 border border-slate-200 cursor-pointer active:scale-95 transition"
+                    title="Kurang 1 menit"
+                  >
+                    −1m
+                  </button>
+                  <span className="font-mono text-sm font-black text-[#00897b] px-3 bg-teal-50 rounded-lg border border-teal-200 py-1 shadow-2xs">
+                    :{String(selectedMin).padStart(2, '0')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMin((prev) => (prev + 1) % 60)}
+                    className="px-3 py-1 rounded-lg text-xs font-bold text-slate-700 bg-white hover:bg-slate-200 border border-slate-200 cursor-pointer active:scale-95 transition"
+                    title="Tambah 1 menit"
+                  >
+                    +1m
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMin((prev) => (prev + 5) % 60)}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-700 bg-white hover:bg-slate-200 border border-slate-200 cursor-pointer active:scale-95 transition"
+                    title="Tambah 5 menit"
+                  >
+                    +5m
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center mt-3 py-2 text-xs text-slate-400 font-semibold">
+                  Ketuk angka jam (1 - 12) atau geser jarum jam
+                </div>
+              )}
+
+              {/* Bottom Action Buttons (Touch Friendly) */}
+              <div className="w-full flex items-center justify-between pt-4 mt-2.5 border-t border-slate-100 px-1">
                 <button
                   type="button"
                   onClick={handleResetTimePickerNow}
-                  className="text-xs font-bold uppercase tracking-wider text-[#e57373] hover:text-[#d32f2f] px-2 py-1.5 rounded transition cursor-pointer"
+                  className="text-xs font-bold uppercase tracking-wider text-[#e57373] hover:text-[#d32f2f] px-3 py-2 rounded-xl transition cursor-pointer active:scale-95"
                   title="Atur ke jam sekarang"
                 >
                   CLEAR
                 </button>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setShowTimePicker(false)}
-                    className="text-xs font-bold uppercase tracking-wider text-[#00897b] hover:bg-teal-50 px-3 py-1.5 rounded transition cursor-pointer"
+                    className="text-xs font-bold uppercase tracking-wider text-[#00897b] hover:bg-teal-50 px-4 py-2 rounded-xl transition cursor-pointer active:scale-95"
                   >
                     CANCEL
                   </button>
                   <button
                     type="button"
                     onClick={handleConfirmTimePicker}
-                    className="text-xs font-extrabold uppercase tracking-wider text-[#00897b] hover:bg-teal-50 px-3 py-1.5 rounded transition cursor-pointer"
+                    className="text-xs font-black uppercase tracking-wider text-white bg-[#00897b] hover:bg-[#00796b] px-6 py-2 rounded-xl shadow-md transition cursor-pointer active:scale-95"
                   >
                     OK
                   </button>
