@@ -9,6 +9,7 @@ import {
   Bell,
   Boxes,
   Calendar,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -177,6 +178,9 @@ function toLocalInput(dtStr?: string | null): string {
   return `${yyyy}-${MM}-${dd}T${hh}:${mm}`
 }
 
+const HOUR_DIAL_NUMBERS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+const MINUTE_DIAL_NUMBERS = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']
+
 export default function Page() {
   const [activePage, setActivePage] = useState('Dashboard')
   
@@ -269,6 +273,86 @@ export default function Page() {
   const [movQty, setMovQty] = useState('100')
   const [movDatetime, setMovDatetime] = useState(() => toLocalInput(new Date().toISOString()))
   const [movNote, setMovNote] = useState('')
+  const [showTimePicker, setShowTimePicker] = useState(false)
+  const [clockMode, setClockMode] = useState<'hours' | 'minutes'>('hours')
+  const [selectedH12, setSelectedH12] = useState<number>(12)
+  const [selectedMin, setSelectedMin] = useState<number>(0)
+  const [period, setPeriod] = useState<'AM' | 'PM'>('AM')
+  const dialRef = useRef<HTMLDivElement>(null)
+
+  const { date: movDatePart, time: movTimePart } = useMemo(() => {
+    return parseDateTimeString(movDatetime)
+  }, [movDatetime])
+
+  function handleSetTime(newHour: string, newMinute: string) {
+    const d = movDatePart || getLocalDateString()
+    const h = String(newHour).padStart(2, '0')
+    const m = String(newMinute).padStart(2, '0')
+    setMovDatetime(`${d}T${h}:${m}`)
+  }
+
+  function handleOpenTimePicker() {
+    const { time } = parseDateTimeString(movDatetime)
+    const [hStr, mStr] = (time || '00:00').split(':')
+    const h24 = parseInt(hStr || '0', 10)
+    const m = parseInt(mStr || '0', 10)
+    setPeriod(h24 >= 12 ? 'PM' : 'AM')
+    setSelectedH12(h24 % 12 || 12)
+    setSelectedMin(isNaN(m) ? 0 : m)
+    setClockMode('hours')
+    setShowTimePicker(true)
+  }
+
+  function handleConfirmTimePicker() {
+    let h24 = selectedH12 % 12
+    if (period === 'PM') h24 += 12
+    const hStr = String(h24).padStart(2, '0')
+    const mStr = String(selectedMin).padStart(2, '0')
+    handleSetTime(hStr, mStr)
+    setShowTimePicker(false)
+  }
+
+  function handleResetTimePickerNow() {
+    const now = new Date()
+    const h24 = now.getHours()
+    const m = now.getMinutes()
+    setPeriod(h24 >= 12 ? 'PM' : 'AM')
+    setSelectedH12(h24 % 12 || 12)
+    setSelectedMin(m)
+  }
+
+  function handleDialPointer(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dialRef.current) return
+    const rect = dialRef.current.getBoundingClientRect()
+    const cx = rect.width / 2
+    const cy = rect.height / 2
+    const x = e.clientX - rect.left - cx
+    const y = e.clientY - rect.top - cy
+    let deg = Math.atan2(y, x) * (180 / Math.PI) + 90
+    if (deg < 0) deg += 360
+
+    if (clockMode === 'hours') {
+      let h = Math.round(deg / 30) % 12
+      if (h === 0) h = 12
+      setSelectedH12(h)
+    } else {
+      let m = Math.round(deg / 6) % 60
+      setSelectedMin(m)
+    }
+  }
+
+  const preview24 = useMemo(() => {
+    let h24 = selectedH12 % 12
+    if (period === 'PM') h24 += 12
+    return `${String(h24).padStart(2, '0')}:${String(selectedMin).padStart(2, '0')}`
+  }, [selectedH12, selectedMin, period])
+
+  const handAngle = clockMode === 'hours' ? (selectedH12 % 12) * 30 : selectedMin * 6
+
+  function handleSetDate(newDate: string) {
+    const t = movTimePart || getLocalTimeString()
+    setMovDatetime(`${newDate}T${t}`)
+  }
 
   // Part Form fields
   const [partId, setPartId] = useState('')
@@ -688,6 +772,7 @@ export default function Page() {
     setMovDatetime(toLocalInput(new Date().toISOString()))
     setMovQty('100')
     setMovNote('')
+    setShowTimePicker(false)
     setShowMovementForm(true)
   }
 
@@ -709,6 +794,7 @@ export default function Page() {
 
   function handleCloseMovementForm() {
     setShowMovementForm(false)
+    setShowTimePicker(false)
     setEditingMovementId(null)
     setMovNote('')
   }
@@ -752,6 +838,7 @@ export default function Page() {
     }
 
     setShowMovementForm(false)
+    setShowTimePicker(false)
     setEditingMovementId(null)
     setMovQty('100')
     setMovNote('')
@@ -2346,13 +2433,39 @@ export default function Page() {
                   </div>
                 </div>
 
-                {/* Single datetime-local input */}
-                <input
-                  type="datetime-local"
-                  value={movDatetime}
-                  onChange={(e) => setMovDatetime(e.target.value)}
-                  className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-mono font-semibold outline-none focus:border-[#eab308]"
-                />
+                {/* Grid 2 Kolom: Tanggal & Waktu (Popup Time Picker) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-500 mb-1 block">
+                      Tanggal Transaksi
+                    </label>
+                    <input
+                      type="date"
+                      value={movDatePart}
+                      onChange={(e) => handleSetDate(e.target.value)}
+                      className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-mono font-semibold outline-none focus:border-[#eab308]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-500 mb-1 block">
+                      Waktu Transaksi (Jam : Menit)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleOpenTimePicker}
+                      className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-mono font-bold flex items-center justify-between hover:border-[#00897b] hover:bg-teal-50/30 transition group cursor-pointer text-slate-800"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Clock size={16} className="text-[#00897b] group-hover:scale-110 transition-transform" />
+                        <span>{movTimePart || '00:00'}</span>
+                        <span className="text-[10px] font-sans text-slate-400 font-normal">WIB</span>
+                      </div>
+                      <span className="text-[11px] font-sans font-bold text-[#00897b] bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md group-hover:bg-teal-100 transition">
+                        Pilih Jam ▾
+                      </span>
+                    </button>
+                  </div>
+                </div>
 
                 {/* Live formatted date preview */}
                 <div className="text-[11px] text-slate-500 font-mono font-semibold text-right">
@@ -2584,6 +2697,265 @@ export default function Page() {
               >
                 {editingMovementId ? '💾 Simpan Perubahan' : '💾 Simpan Transaksi'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP ANALOG CLOCK TIME PICKER MODAL (MATERIAL DESIGN) */}
+      {showTimePicker && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 animate-in fade-in duration-150"
+          onClick={() => setShowTimePicker(false)}
+        >
+          <div
+            className="w-full max-w-[430px] rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col sm:flex-row animate-in zoom-in-95 duration-150 border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Left Sidebar: Teal Header Display */}
+            <div className="bg-[#00897b] text-white p-5 flex flex-row sm:flex-col items-center justify-between sm:justify-center sm:w-[130px] shrink-0">
+              <div className="text-[10px] font-extrabold uppercase tracking-widest text-teal-200/90 mb-1 sm:mb-4 hidden sm:block">
+                WAKTU
+              </div>
+
+              {/* Huge Hour & Minute Digits */}
+              <div className="flex sm:flex-col items-center">
+                <button
+                  type="button"
+                  onClick={() => setClockMode('hours')}
+                  className={`font-mono text-4xl sm:text-5xl font-black leading-none transition cursor-pointer p-1 rounded-lg ${
+                    clockMode === 'hours'
+                      ? 'text-white scale-105 drop-shadow'
+                      : 'text-teal-200/70 hover:text-white'
+                  }`}
+                  title="Pilih Jam"
+                >
+                  {String(selectedH12).padStart(2, '0')}
+                </button>
+                <span className="font-mono text-3xl sm:text-4xl text-teal-200/60 my-0.5 mx-1 sm:mx-0 select-none">
+                  :
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setClockMode('minutes')}
+                  className={`font-mono text-4xl sm:text-5xl font-black leading-none transition cursor-pointer p-1 rounded-lg ${
+                    clockMode === 'minutes'
+                      ? 'text-white scale-105 drop-shadow'
+                      : 'text-teal-200/70 hover:text-white'
+                  }`}
+                  title="Pilih Menit"
+                >
+                  {String(selectedMin).padStart(2, '0')}
+                </button>
+              </div>
+
+              {/* AM / PM Toggle */}
+              <div className="flex sm:flex-col gap-1.5 sm:mt-5 sm:w-full">
+                <button
+                  type="button"
+                  onClick={() => setPeriod('AM')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    period === 'AM'
+                      ? 'bg-white text-[#00897b] font-extrabold shadow-md'
+                      : 'text-teal-100 hover:bg-teal-700/60'
+                  }`}
+                >
+                  AM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriod('PM')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    period === 'PM'
+                      ? 'bg-white text-[#00897b] font-extrabold shadow-md'
+                      : 'text-teal-100 hover:bg-teal-700/60'
+                  }`}
+                >
+                  PM
+                </button>
+              </div>
+
+              {/* 24h helper */}
+              <div className="hidden sm:block text-[10px] font-mono text-teal-100 font-semibold mt-4 text-center">
+                24H: {preview24}
+              </div>
+            </div>
+
+            {/* Right Section: Circular Dial Face & Actions */}
+            <div className="flex-1 p-4 sm:p-5 flex flex-col items-center justify-between bg-white">
+              {/* Mode Indicator Tabs */}
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setClockMode('hours')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
+                    clockMode === 'hours'
+                      ? 'bg-teal-50 text-[#00897b] border border-teal-200'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Jam (1 - 12)
+                </button>
+                <span className="text-slate-300">•</span>
+                <button
+                  type="button"
+                  onClick={() => setClockMode('minutes')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
+                    clockMode === 'minutes'
+                      ? 'bg-teal-50 text-[#00897b] border border-teal-200'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Menit (00 - 55)
+                </button>
+              </div>
+
+              {/* Analog Clock Dial (250px x 250px) */}
+              <div
+                ref={dialRef}
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  handleDialPointer(e)
+                }}
+                onPointerMove={(e) => {
+                  if (e.buttons > 0) handleDialPointer(e)
+                }}
+                onPointerUp={(e) => {
+                  try {
+                    e.currentTarget.releasePointerCapture(e.pointerId)
+                  } catch {}
+                  if (clockMode === 'hours') {
+                    setTimeout(() => setClockMode('minutes'), 180)
+                  }
+                }}
+                className="relative w-[250px] h-[250px] rounded-full bg-slate-100/90 select-none cursor-pointer touch-none shadow-inner border border-slate-200/50"
+              >
+                {/* Center Pivot Dot */}
+                <div className="absolute left-[125px] top-[125px] w-2.5 h-2.5 rounded-full bg-[#00897b] -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none" />
+
+                {/* Hand Stem Line & Indicator Thumb */}
+                <div
+                  className="absolute left-[125px] top-[125px] pointer-events-none transition-transform duration-100 ease-out z-10"
+                  style={{
+                    transform: `rotate(${handAngle}deg)`,
+                    transformOrigin: '0 0',
+                  }}
+                >
+                  {/* Stem Line from center up to -92px */}
+                  <div
+                    className="absolute bg-[#00897b] -translate-x-1/2"
+                    style={{
+                      left: '0px',
+                      bottom: '0px',
+                      width: '2px',
+                      height: '92px',
+                    }}
+                  />
+                  {/* Teal circle thumb at tip (-92px) */}
+                  <div
+                    className="absolute rounded-full bg-[#00897b] flex items-center justify-center -translate-x-1/2 -translate-y-1/2 shadow-md"
+                    style={{
+                      left: '0px',
+                      top: '-92px',
+                      width: '34px',
+                      height: '34px',
+                    }}
+                  >
+                    <span className="text-white text-xs font-mono font-bold select-none">
+                      {clockMode === 'hours'
+                        ? selectedH12
+                        : String(selectedMin).padStart(2, '0')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Numbers around the clock face */}
+                {clockMode === 'hours'
+                  ? HOUR_DIAL_NUMBERS.map((num, i) => {
+                      const rad = (i * 30 - 90) * (Math.PI / 180)
+                      const left = 125 + 92 * Math.cos(rad)
+                      const top = 125 + 92 * Math.sin(rad)
+                      const isSelected = num === selectedH12
+                      return (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedH12(num)
+                            setTimeout(() => setClockMode('minutes'), 180)
+                          }}
+                          style={{
+                            left: `${left}px`,
+                            top: `${top}px`,
+                          }}
+                          className={`absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center font-mono text-xs font-semibold z-20 transition cursor-pointer select-none ${
+                            isSelected
+                              ? 'opacity-0 pointer-events-none'
+                              : 'text-slate-700 hover:text-[#00897b] hover:bg-teal-50'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      )
+                    })
+                  : MINUTE_DIAL_NUMBERS.map((numStr, i) => {
+                      const rad = (i * 30 - 90) * (Math.PI / 180)
+                      const left = 125 + 92 * Math.cos(rad)
+                      const top = 125 + 92 * Math.sin(rad)
+                      const val = parseInt(numStr, 10)
+                      const isSelected = val === selectedMin
+                      return (
+                        <button
+                          key={numStr}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedMin(val)
+                          }}
+                          style={{
+                            left: `${left}px`,
+                            top: `${top}px`,
+                          }}
+                          className={`absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center font-mono text-xs font-semibold z-20 transition cursor-pointer select-none ${
+                            isSelected
+                              ? 'opacity-0 pointer-events-none'
+                              : 'text-slate-700 hover:text-[#00897b] hover:bg-teal-50'
+                          }`}
+                        >
+                          {numStr}
+                        </button>
+                      )
+                    })}
+              </div>
+
+              {/* Bottom Action Buttons (CLEAR, CANCEL, OK) */}
+              <div className="w-full flex items-center justify-between pt-4 mt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleResetTimePickerNow}
+                  className="text-xs font-bold uppercase tracking-wider text-[#e57373] hover:text-[#d32f2f] px-2 py-1.5 rounded transition cursor-pointer"
+                  title="Atur ke jam sekarang"
+                >
+                  CLEAR
+                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowTimePicker(false)}
+                    className="text-xs font-bold uppercase tracking-wider text-[#00897b] hover:bg-teal-50 px-3 py-1.5 rounded transition cursor-pointer"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmTimePicker}
+                    className="text-xs font-extrabold uppercase tracking-wider text-[#00897b] hover:bg-teal-50 px-3 py-1.5 rounded transition cursor-pointer"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
